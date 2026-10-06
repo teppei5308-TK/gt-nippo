@@ -109,7 +109,7 @@
 <script>
   var LIFF_ID = '2011853204-GVDc6N2x';
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
-  var CONFIG = {}, LAST_REVIEW = {}, STORE = '';
+  var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, STORE = '';
   var profile = { userId: '', displayName: '' };
   var photoDaily = null, photoCat = null, photoItems = [], photoProd = [];
   var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
@@ -127,7 +127,7 @@
 
   // 店舗設定を読み込む
   fetch(API_URL + '?action=config').then(function (r) { return r.json(); }).then(function (j) {
-    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {};
+    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {}; DENGON = j.dengon || {};
     var box = document.getElementById('storeChips'); box.innerHTML = ''; box.dataset.single = '1';
     Object.keys(CONFIG).forEach(function (s) { box.appendChild(el('span', { class: 'chip', text: s })); });
     if (!Object.keys(CONFIG).length) box.appendChild(el('span', { class: 'loading', text: '店舗の設定がありません（日報設定シートを確認）' }));
@@ -150,6 +150,13 @@
     var cc = document.getElementById('customComments'); cc.innerHTML = '';
     cms.forEach(function (c) { cc.appendChild(el('p', { class: 'lab', text: c.section })); cc.appendChild(el('textarea', { 'data-cm': c.name })); });
     if (hasProd) auto.push('製造表から：作った数・残り' + (cfg.some(function (c) { return c.name === '製造ミス'; }) ? '・製造ミス' : '') + (mfgItems.length ? '・' + mfgItems.map(function (c) { return c.name; }).join('・') + 'の製造数' : ''));
+    (DENGON[STORE] || []).forEach(function (d) {
+      var kids = [el('p', { class: 'q', text: '早番からの伝言（' + (d.name || '—') + '・' + d.time + '）' }), el('p', { class: 'hint', text: 'この内容は日報に自動で入ります。ここに書き直す必要はありません。' })];
+      d.pos.forEach(function (x) { kids.push(el('p', { class: 'lab', text: '良い：' + x })); });
+      d.neg.forEach(function (x) { kids.push(el('p', { class: 'lab', text: '気になる：' + x })); });
+      if (d.text) kids.push(el('p', { class: 'lab', text: d.text }));
+      dyn.appendChild(el('div', { class: 'card' }, kids));
+    });
     if (auto.length) dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: '写真から自動で読む数字' }), el('p', { class: 'hint', text: auto.join('・') })]));
     if (nums.length) {
       var c1 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '数の入力' })]);
