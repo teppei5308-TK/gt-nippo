@@ -61,15 +61,15 @@
   </div>
 
   <div class="card">
-    <p class="q">レジ画面の写真 <small>タップして撮影</small></p>
+    <p class="q">Airレジの画面 <small>スクリーンショットか写真</small></p>
     <div class="photo">
-      <label class="ph" id="phDaily"><b>① 日次締め（精算）</b><span>純売上・客数が出る画面</span><input type="file" accept="image/*" capture="environment" id="inDaily"></label>
-      <label class="ph" id="phCat"><b>② カテゴリ別</b><span>ドリンクの杯数が出る画面</span><input type="file" accept="image/*" capture="environment" id="inCat"></label>
+      <label class="ph" id="phDaily"><b>① 日別売上（上の部分）</b><span>売上合計・内消費税等・客数</span><input type="file" accept="image/*" id="inDaily"></label>
+      <label class="ph" id="phCat"><b>② 販売商品（閉じたまま）</b><span>カテゴリごとの点数・金額</span><input type="file" accept="image/*" id="inCat"></label>
     </div>
-    <p class="lab">③ 商品別売上 <small>（フェア・食パン・物販が写るように。何枚でも）</small></p>
-    <label class="ph" style="min-height:56px"><b>＋ 商品別の写真を追加</b><input type="file" accept="image/*" capture="environment" id="inItems"></label>
+    <p class="lab">③ 販売商品（「すべての項目を開く」を押した画面）<small>スクロールして何枚でも</small></p>
+    <label class="ph" style="min-height:56px"><b>＋ 商品ごとの画面を追加</b><input type="file" accept="image/*" id="inItems"></label>
     <div class="thumbs" id="itemThumbs"></div>
-    <p class="hint">写真は端末内で縮小してから送ります。数字は写真から自動で読み取ります。</p>
+    <p class="hint">iPad のスクリーンショット（ホームボタン＋電源ボタン）を選ぶと、文字がはっきりして読み取りが正確です。写真で撮るときは画面に正面から。</p>
   </div>
 
   <div id="dyn"></div>
@@ -78,10 +78,13 @@
     <p class="q">コメント</p>
     <p class="lab">担当の持ち場</p>
     <div class="chips" data-name="role" data-single="1"><span class="chip">ホール</span><span class="chip">キッチン</span><span class="chip">製造</span></div>
+    <div id="defaultComments">
     <p class="lab">お客様の声（ポジティブ）</p><textarea id="cPos" placeholder="例：カレーパンが揚げたてで良かった"></textarea>
     <p class="lab">お客様の声（ネガティブ）</p><textarea id="cNeg" placeholder="例：贈答用の箱のサイズが合わない"></textarea>
     <p class="lab">売上・販売に対して、自分が努力したこと</p><textarea id="cEffort"></textarea>
     <p class="lab">次の出勤で目標にすること</p><textarea id="cNext"></textarea>
+    </div>
+    <div id="customComments"></div>
     <div class="hide" id="nameBox" style="margin-top:10px"><p class="lab">お名前</p><input type="text" id="name" placeholder="LINEの名前を取得できないときだけ"></div>
     <p class="err" id="err"></p>
   </div>
@@ -131,7 +134,11 @@
     var ars = cfg.filter(function (c) { return c.type === '売掛'; });
     var rv = cfg.filter(function (c) { return c.type === '口コミ'; })[0];
     var texts = cfg.filter(function (c) { return c.type === '記述'; });
-    var auto = cfg.filter(function (c) { return c.type === '指標' || c.type === '商品'; }).map(function (c) { return c.name; });
+    var auto = cfg.filter(function (c) { return (c.type === '指標' || c.type === '商品' || c.type === '部門') && c.name !== '合計'; }).map(function (c) { return c.name; });
+    var cms = cfg.filter(function (c) { return c.type === 'コメント'; });
+    document.getElementById('defaultComments').style.display = cms.length ? 'none' : '';
+    var cc = document.getElementById('customComments'); cc.innerHTML = '';
+    cms.forEach(function (c) { cc.appendChild(el('p', { class: 'lab', text: c.section })); cc.appendChild(el('textarea', { 'data-cm': c.name })); });
     if (auto.length) dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: '写真から自動で読む数字' }), el('p', { class: 'hint', text: auto.join('・') })]));
     if (nums.length) {
       var c1 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '数の入力' })]);
@@ -139,15 +146,15 @@
       nums.forEach(function (c) {
         if (c.section !== lastSec) { c1.appendChild(el('p', { class: 'lab', text: c.section })); lastSec = c.section; }
         var inp = el('input', { type: 'number', inputmode: 'numeric', 'data-num': c.name, min: '0' });
-        c1.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + c.unit + '）' }), inp]));
+        c1.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + c.unit + '）' + (c.tWeek ? ' / ' + c.tWeek : '') }), inp]));
       });
       dyn.appendChild(c1);
     }
     if (mfgItems.length) {
-      var c2 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '製造数' }), el('p', { class: 'hint', text: '販売数は写真から読みます。ここには今日の製造数を入れてください。' })]);
+      var c2 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '製造数・用意数' }), el('p', { class: 'hint', text: '販売数は写真から読みます。ここには今日の製造数（用意した数）を入れてください。' })]);
       mfgItems.forEach(function (c) {
         var inp = el('input', { type: 'number', inputmode: 'numeric', 'data-mfg': c.name, min: '0' });
-        c2.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + c.unit + '）' }), inp]));
+        c2.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + (c.mfgLabel || '製造') + '数・' + c.unit + '）' }), inp]));
       });
       dyn.appendChild(c2);
     }
@@ -166,8 +173,15 @@
         el('div', { class: 'row' }, [el('label', { text: '口コミの件数（いまの累計）' }), el('input', { type: 'number', inputmode: 'numeric', id: 'rvTotal', min: '0' })]),
         el('p', { class: 'hint', text: typeof last === 'number' ? '前回の日報では ' + last + ' 件。増えた数は自動で計算します。' : '増えた数は前回の日報から自動で計算します。' })]));
     }
-    texts.forEach(function (c) {
-      dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: c.section }), el('textarea', { 'data-text': c.name })]));
+    var bySec = {}, secOrder = [];
+    texts.forEach(function (c) { if (!bySec[c.section]) { bySec[c.section] = []; secOrder.push(c.section); } bySec[c.section].push(c); });
+    secOrder.forEach(function (sec) {
+      var card = el('div', { class: 'card' }, [el('p', { class: 'q', text: sec })]);
+      bySec[sec].forEach(function (c) {
+        if (bySec[sec].length > 1 || c.name.length > 6) card.appendChild(el('p', { class: 'lab', text: c.name }));
+        card.appendChild(el('textarea', { 'data-text': c.name }));
+      });
+      dyn.appendChild(card);
     });
   }
 
@@ -228,21 +242,22 @@
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
-    if (!photoDaily) { err.textContent = '①日次締めの写真を撮ってください'; return; }
+    if (!photoDaily) { err.textContent = '①日別売上の画面を入れてください'; return; }
     var mfg = {}, nums = {}, texts = {}, arMap = {};
     document.querySelectorAll('[data-mfg]').forEach(function (i) { if (i.value !== '') mfg[i.dataset.mfg] = Number(i.value); });
     document.querySelectorAll('[data-num]').forEach(function (i) { if (i.value !== '') nums[i.dataset.num] = Number(i.value); });
     document.querySelectorAll('[data-text]').forEach(function (i) { if (i.value.trim()) texts[i.dataset.text] = i.value.trim(); });
     document.querySelectorAll('[data-ar]').forEach(function (i) { var a = arMap[i.dataset.ar] = arMap[i.dataset.ar] || { name: i.dataset.ar }; if (i.value !== '') a[i.dataset.f] = i.dataset.f === 'amount' ? Number(i.value) : i.value.trim(); });
     var rvA = document.getElementById('rvAsked'), rvT = document.getElementById('rvTotal');
-    var photos = [{ name: '日次締め', dataUrl: photoDaily }];
-    if (photoCat) photos.push({ name: 'カテゴリ別', dataUrl: photoCat });
-    photoItems.forEach(function (d, i) { photos.push({ name: '商品別' + (i + 1), dataUrl: d }); });
+    var custom = {}; document.querySelectorAll('[data-cm]').forEach(function (i) { if (i.value.trim()) custom[i.dataset.cm] = i.value.trim(); });
+    var photos = [{ name: '日別売上', dataUrl: photoDaily }];
+    if (photoCat) photos.push({ name: '販売商品（カテゴリ）', dataUrl: photoCat });
+    photoItems.forEach(function (d, i) { photos.push({ name: '販売商品（商品ごと）' + (i + 1), dataUrl: d }); });
     var payload = {
       store: STORE, weather: val('weather'), photos: photos, mfg: mfg, nums: nums, texts: texts,
       ar: Object.keys(arMap).map(function (k) { return arMap[k]; }),
       review: { asked: rvA && rvA.value !== '' ? Number(rvA.value) : '', total: rvT && rvT.value !== '' ? Number(rvT.value) : '' },
-      comments: { role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim(), effort: document.getElementById('cEffort').value.trim(), next: document.getElementById('cNext').value.trim() },
+      comments: { custom: custom, role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim(), effort: document.getElementById('cEffort').value.trim(), next: document.getElementById('cNext').value.trim() },
       name: document.getElementById('name').value
     };
     var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（写真から数字を読み取っています）';
