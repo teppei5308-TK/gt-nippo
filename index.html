@@ -54,13 +54,22 @@
   </div>
 
   <div class="card">
+    <p class="q">登録する内容</p>
+    <div class="chips" id="modeChips"><span class="chip" data-mode="締め">締め（日報を完成）</span><span class="chip" data-mode="製造">製造</span><span class="chip" data-mode="早番">早番・途中で上がる</span></div>
+    <p class="hint" id="modeHint">製造・早番の人は自分の分だけ登録してください。締めの人が送ると、全部まとめて1本の日報になります。</p>
+  </div>
+
+  <div id="main" class="hide">
+  <div class="card hide" id="partsCard"></div>
+
+  <div class="card" id="weatherCard">
     <p class="q">天気</p>
     <div class="chips" data-name="weather" data-single="1">
       <span class="chip">☀</span><span class="chip">☁</span><span class="chip">☂</span><span class="chip">☃</span>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="regiCard">
     <p class="q">Airレジの画面 <small>スクリーンショットか写真</small></p>
     <div class="photo">
       <label class="ph" id="phDaily"><b>① 日別売上（上の部分）</b><span>売上合計・内消費税等・客数</span><input type="file" accept="image/*" id="inDaily"></label>
@@ -76,25 +85,33 @@
     <p class="q">製造表（紙） <small>表・裏の写真</small></p>
     <label class="ph" style="min-height:56px"><b>＋ 製造表の写真を追加</b><span>表と裏の2枚（ページがあれば全部）</span><input type="file" accept="image/*" id="inProd"></label>
     <div class="thumbs" id="prodThumbs"></div>
-    <p class="hint">紙全体が入るように、真上から明るい場所で撮ってください。残りの数は、その商品の行の「店頭残」の欄に書くと正確に読めます。売り切れは空欄のままで大丈夫です。</p>
+    <p class="hint" id="prodHint"></p>
+  </div>
+
+  <div class="card hide" id="noteCard">
+    <p class="q">製造からの連絡 <small>任意</small></p>
+    <textarea id="pNote" placeholder="例：明日の食パンは粉の入荷待ちで15本まで"></textarea>
   </div>
 
   <div id="dyn"></div>
 
-  <div class="card">
+  <div class="card" id="commentCard">
     <p class="q">コメント</p>
     <p class="lab">担当の持ち場</p>
     <div class="chips" data-name="role" data-single="1"><span class="chip">ホール</span><span class="chip">キッチン</span><span class="chip">製造</span></div>
     <div id="defaultComments">
     <p class="lab">お客様の声（ポジティブ）</p><textarea id="cPos" placeholder="例：カレーパンが揚げたてで良かった"></textarea>
     <p class="lab">お客様の声（ネガティブ）</p><textarea id="cNeg" placeholder="例：贈答用の箱のサイズが合わない"></textarea>
+    <div id="effortBox">
     <p class="lab">売上・販売に対して、自分が努力したこと</p><textarea id="cEffort"></textarea>
     <p class="lab">次の出勤で目標にすること</p><textarea id="cNext"></textarea>
     </div>
+    </div>
     <div id="customComments"></div>
     <div class="hide" id="nameBox" style="margin-top:10px"><p class="lab">お名前</p><input type="text" id="name" placeholder="LINEの名前を取得できないときだけ"></div>
-    <p class="err" id="err"></p>
   </div>
+  </div>
+  <p class="err" id="err"></p>
 </div>
 
 <div class="wrap hide" id="result">
@@ -109,7 +126,7 @@
 <script>
   var LIFF_ID = '2011853204-GVDc6N2x';
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
-  var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, STORE = '';
+  var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, STORE = '', MODE = '';
   var profile = { userId: '', displayName: '' };
   var photoDaily = null, photoCat = null, photoItems = [], photoProd = [];
   var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
@@ -122,12 +139,14 @@
     var g = c.parentElement;
     if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); } else c.classList.toggle('on');
     if (g.id === 'storeChips') { STORE = c.textContent.trim(); renderDyn(); }
+    if (g.id === 'modeChips') { MODE = c.dataset.mode; renderDyn(); }
   });
   function val(name) { var g = document.querySelector('.chips[data-name="' + name + '"]'); var on = g && g.querySelector('.chip.on'); return on ? on.textContent.trim() : ''; }
 
   // 店舗設定を読み込む
   fetch(API_URL + '?action=config').then(function (r) { return r.json(); }).then(function (j) {
-    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {}; DENGON = j.dengon || {};
+    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {}; DENGON = j.dengon || {}; PARTS = j.parts || {};
+    document.getElementById('modeChips').dataset.single = '1';
     var box = document.getElementById('storeChips'); box.innerHTML = ''; box.dataset.single = '1';
     Object.keys(CONFIG).forEach(function (s) { box.appendChild(el('span', { class: 'chip', text: s })); });
     if (!Object.keys(CONFIG).length) box.appendChild(el('span', { class: 'loading', text: '店舗の設定がありません（日報設定シートを確認）' }));
@@ -137,20 +156,40 @@
   function renderDyn() {
     var dyn = document.getElementById('dyn'); dyn.innerHTML = '';
     var cfg = CONFIG[STORE] || [];
+    var show = function (id, on) { document.getElementById(id).classList.toggle('hide', !on); };
+    var CLOSE = MODE === '締め', MAKE = MODE === '製造', EARLY = MODE === '早番';
+    show('main', !!(STORE && MODE));
+    show('weatherCard', CLOSE); show('regiCard', CLOSE); show('noteCard', MAKE); show('commentCard', !MAKE); show('effortBox', CLOSE);
+    document.getElementById('send').textContent = CLOSE ? '日報を送信する' : (MODE ? MODE + 'の分を登録する' : '送信する');
+    var pc = document.getElementById('partsCard'), plist = (PARTS[STORE] || []).concat((DENGON[STORE] || []).map(function (d) {
+      return { kind: 'LINEの伝言', name: d.name, time: d.time, lines: d.pos.map(function (x) { return '良い：' + x; }).concat(d.neg.map(function (x) { return '気になる：' + x; })).concat(d.text ? [d.text] : []) }; }));
+    pc.innerHTML = ''; show('partsCard', CLOSE && plist.length > 0);
+    if (plist.length) {
+      pc.appendChild(el('p', { class: 'q', text: '今日の途中登録（日報に自動で入ります）' }));
+      plist.forEach(function (x) { pc.appendChild(el('p', { class: 'lab', text: '■ ' + x.kind + '（' + (x.name || '—') + '・' + x.time + '）' }));
+        x.lines.forEach(function (l) { pc.appendChild(el('p', { class: 'hint', text: l })); }); });
+      pc.appendChild(el('p', { class: 'hint', text: 'ここに書き直す必要はありません。同じ欄に入力すると、締めの入力が優先されます。' }));
+    }
     var mfgItems = cfg.filter(function (c) { return c.type === '商品' && c.mfg; });
     var hasProd = cfg.some(function (c) { return c.type === '製造表'; });
-    document.getElementById('prodCard').classList.toggle('hide', !hasProd);
-    var nums = cfg.filter(function (c) { return c.type === '数値' && !(hasProd && PROD_NUMS.indexOf(c.name) >= 0); });
+    show('prodCard', hasProd && (CLOSE || MAKE));
+    document.getElementById('prodHint').textContent = MAKE ? '紙全体が入るように真上から撮ってください。店頭残がまだ空欄でも大丈夫です（作った数だけ読みます）。'
+      : '店頭残を書き込んだあとの製造表を、紙全体が入るように真上から撮ってください。残りの数はその商品の行の「店頭残」の欄に。売り切れは空欄で大丈夫です。';
+    var nums = cfg.filter(function (c) { return c.type === '数値' && (CLOSE ? !(hasProd && PROD_NUMS.indexOf(c.name) >= 0)
+      : MAKE ? (/製造|まかない/.test(c.section) && c.name !== '閉店時の残数' && !(hasProd && c.name === '店舗分')) : false); });
     var ars = cfg.filter(function (c) { return c.type === '売掛'; });
-    var rv = cfg.filter(function (c) { return c.type === '口コミ'; })[0];
-    var texts = cfg.filter(function (c) { return c.type === '記述'; });
+    var rv = MAKE ? null : cfg.filter(function (c) { return c.type === '口コミ'; })[0];
+    var texts = MAKE ? [] : cfg.filter(function (c) { return c.type === '記述' && (CLOSE || !/予約/.test(c.section)); });
+    if (MAKE || (!CLOSE && !EARLY)) { ars = []; }
     var auto = cfg.filter(function (c) { return (c.type === '指標' || c.type === '商品' || c.type === '部門') && c.name !== '合計'; }).map(function (c) { return c.name; });
     var cms = cfg.filter(function (c) { return c.type === 'コメント'; });
     document.getElementById('defaultComments').style.display = cms.length ? 'none' : '';
     var cc = document.getElementById('customComments'); cc.innerHTML = '';
     cms.forEach(function (c) { cc.appendChild(el('p', { class: 'lab', text: c.section })); cc.appendChild(el('textarea', { 'data-cm': c.name })); });
-    if (hasProd) auto.push('製造表から：作った数・残り' + (cfg.some(function (c) { return c.name === '製造ミス'; }) ? '・製造ミス' : '') + (mfgItems.length ? '・' + mfgItems.map(function (c) { return c.name; }).join('・') + 'の製造数' : ''));
-    (DENGON[STORE] || []).forEach(function (d) {
+    if (!CLOSE) auto = [];
+    if (hasProd && CLOSE) auto.push('製造表から：作った数・残り' + (cfg.some(function (c) { return c.name === '製造ミス'; }) ? '・製造ミス' : '') + (mfgItems.length ? '・' + mfgItems.map(function (c) { return c.name; }).join('・') + 'の製造数' : ''));
+    if (EARLY) mfgItems = [];
+    if (false) (DENGON[STORE] || []).forEach(function (d) {
       var kids = [el('p', { class: 'q', text: '早番からの伝言（' + (d.name || '—') + '・' + d.time + '）' }), el('p', { class: 'hint', text: 'この内容は日報に自動で入ります。ここに書き直す必要はありません。' })];
       d.pos.forEach(function (x) { kids.push(el('p', { class: 'lab', text: '良い：' + x })); });
       d.neg.forEach(function (x) { kids.push(el('p', { class: 'lab', text: '気になる：' + x })); });
@@ -188,8 +227,8 @@
       var last = LAST_REVIEW[STORE];
       dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: rv.section }),
         el('div', { class: 'row' }, [el('label', { text: '声かけした人数' }), el('input', { type: 'number', inputmode: 'numeric', id: 'rvAsked', min: '0' })]),
-        el('div', { class: 'row' }, [el('label', { text: '口コミの件数（いまの累計）' }), el('input', { type: 'number', inputmode: 'numeric', id: 'rvTotal', min: '0' })]),
-        el('p', { class: 'hint', text: typeof last === 'number' ? '前回の日報では ' + last + ' 件。増えた数は自動で計算します。' : '増えた数は前回の日報から自動で計算します。' })]));
+        CLOSE ? el('div', { class: 'row' }, [el('label', { text: '口コミの件数（いまの累計）' }), el('input', { type: 'number', inputmode: 'numeric', id: 'rvTotal', min: '0' })]) : null,
+        el('p', { class: 'hint', text: !CLOSE ? '自分が声をかけた人数だけ。締めの人の人数と合計します。' : typeof last === 'number' ? '前回の日報では ' + last + ' 件。増えた数は自動で計算します。' : '増えた数は前回の日報から自動で計算します。' })]));
     }
     var bySec = {}, secOrder = [];
     texts.forEach(function (c) { if (!bySec[c.section]) { bySec[c.section] = []; secOrder.push(c.section); } bySec[c.section].push(c); });
@@ -267,10 +306,48 @@
     }).catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。日報は保存されています。'; });
   }
 
+  // 製造・早番の途中登録
+  function collect() {
+    var mfg = {}, nums = {}, texts = {}, arMap = {}, custom = {};
+    document.querySelectorAll('[data-mfg]').forEach(function (i) { if (i.value !== '') mfg[i.dataset.mfg] = Number(i.value); });
+    document.querySelectorAll('[data-num]').forEach(function (i) { if (i.value !== '') nums[i.dataset.num] = Number(i.value); });
+    document.querySelectorAll('[data-text]').forEach(function (i) { if (i.value.trim()) texts[i.dataset.text] = i.value.trim(); });
+    document.querySelectorAll('[data-ar]').forEach(function (i) { var a = arMap[i.dataset.ar] = arMap[i.dataset.ar] || { name: i.dataset.ar }; if (i.value !== '') a[i.dataset.f] = i.dataset.f === 'amount' ? Number(i.value) : i.value.trim(); });
+    document.querySelectorAll('[data-cm]').forEach(function (i) { if (i.value.trim()) custom[i.dataset.cm] = i.value.trim(); });
+    return { mfg: mfg, nums: nums, texts: texts, ar: Object.keys(arMap).map(function (k) { return arMap[k]; }).filter(function (a) { return a.content || a.amount; }), custom: custom };
+  }
+  function sendPart() {
+    var err = document.getElementById('err'), c = collect();
+    var rvA = document.getElementById('rvAsked');
+    var photos = []; if (!document.getElementById('prodCard').classList.contains('hide')) photoProd.forEach(function (d, i) { photos.push({ name: '製造表' + (i + 1), dataUrl: d }); });
+    var payload = { store: STORE, kind: MODE, photos: photos, mfg: c.mfg, nums: c.nums, texts: c.texts, ar: c.ar,
+      review: { asked: rvA && rvA.value !== '' ? Number(rvA.value) : '' },
+      comments: MODE === '製造' ? {} : { custom: c.custom, role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim() },
+      note: MODE === '製造' ? document.getElementById('pNote').value.trim() : '', name: document.getElementById('name').value };
+    var cm = payload.comments, empty = !photos.length && !Object.keys(c.mfg).length && !Object.keys(c.nums).length && !Object.keys(c.texts).length && !c.ar.length && payload.review.asked === '' && !payload.note && !(cm.pos || cm.neg || Object.keys(cm.custom || {}).length);
+    if (empty) { err.textContent = '登録する内容を1つ以上入れてください'; return; }
+    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = photos.length ? '登録中…（製造表を読み取っています）' : '登録中…';
+    var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'part', token: token, payload: payload }) })
+      .then(function (res) { return res.json(); })
+      .then(function (r) {
+        if (!r || !r.ok) throw new Error((r && r.error) || '登録できませんでした');
+        document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
+        document.getElementById('result').classList.remove('hide');
+        document.querySelector('#result h1').textContent = '登録しました';
+        document.getElementById('preview').textContent = r.message;
+        var note = document.getElementById('doneNote'); note.textContent = 'お疲れさまでした。締めの人が日報を送ると、この内容も入ります。';
+        try { var ctx = liff.getContext(); if (ctx && (ctx.type === 'group' || ctx.type === 'room')) liff.sendMessages([{ type: 'text', text: MODE + 'の分を登録しました：' + STORE }]).catch(function () {}); } catch (e) {}
+      })
+      .catch(function (e) { btn.disabled = false; btn.textContent = MODE + 'の分を登録する'; err.textContent = '登録に失敗しました: ' + e.message; });
+  }
+
   // 送信
   document.getElementById('send').addEventListener('click', function () {
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
+    if (!MODE) { err.textContent = '登録する内容（締め・製造・早番）を選んでください'; return; }
+    if (MODE !== '締め') return sendPart();
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
     if (!photoDaily) { err.textContent = '①日別売上の画面を入れてください'; return; }
     var mfg = {}, nums = {}, texts = {}, arMap = {};
