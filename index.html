@@ -8,14 +8,14 @@
   :root{--bg:#f6f4ef;--card:#fff;--ink:#23262b;--muted:#6f757d;--line:#dcd8cf;--acc:#5E7A4A;--acc2:#2F4858;--warn:#8F6A1C}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:16px;line-height:1.6}
-  .wrap{max-width:560px;margin:0 auto;padding:14px 14px 90px}
+  .wrap{max-width:560px;margin:0 auto;padding:14px 14px 96px}
   h1{font-size:18px;margin:6px 0 2px}
   .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 12px}
   .q{font-weight:700;font-size:14px;margin:0 0 8px}
   .q small{font-weight:400;color:var(--muted);margin-left:6px}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{border:1px solid var(--line);border-radius:999px;padding:8px 14px;background:#fff;font-size:15px}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:8px 14px;background:#fff;font-size:15px;cursor:pointer}
   .chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
   .photo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .ph{border:1.5px dashed var(--line);border-radius:10px;padding:10px;text-align:center;font-size:13px;color:var(--muted);position:relative;min-height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#fff}
@@ -23,9 +23,16 @@
   .ph img{width:100%;height:84px;object-fit:cover;border-radius:6px}
   .ph input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
   .ph b{font-size:13px;color:var(--ink)}
-  input[type=text],input[type=number],textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;background:#fff}
-  textarea{min-height:44px;resize:vertical}
-  .row{display:flex;gap:8px;margin-bottom:8px}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .thumb{position:relative}
+  .thumb img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block}
+  .thumb button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#9E3F33;color:#fff;font-size:13px;line-height:22px;padding:0}
+  input[type=text],input[type=number],textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:16px;background:#fff;font-family:inherit}
+  textarea{min-height:46px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 96px;gap:8px;align-items:center;margin-bottom:8px}
+  .row label{font-size:14px}
+  .row2{display:grid;grid-template-columns:1fr 110px;gap:8px;margin-bottom:6px}
+  .lab{font-size:13px;color:var(--muted);margin:8px 0 4px}
   .hint{font-size:12px;color:var(--muted);margin-top:6px}
   .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
   button.send{width:100%;max-width:532px;display:block;margin:0 auto;background:var(--acc2);color:#fff;border:0;border-radius:10px;padding:14px;font-size:17px;font-weight:700}
@@ -33,6 +40,7 @@
   .done{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}
   .err{color:#9E3F33;font-size:13px;margin-top:6px}
   .hide{display:none}
+  .loading{color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -42,9 +50,7 @@
 
   <div class="card">
     <p class="q">店舗</p>
-    <div class="chips" data-name="store" data-single="1">
-      <span class="chip">楽書院</span><span class="chip">TERRAS 本店</span><span class="chip">TERRAS 2ND</span>
-    </div>
+    <div class="chips" id="storeChips"><span class="loading">店舗の設定を読み込んでいます…</span></div>
   </div>
 
   <div class="card">
@@ -57,52 +63,26 @@
   <div class="card">
     <p class="q">レジ画面の写真 <small>タップして撮影</small></p>
     <div class="photo">
-      <label class="ph" id="ph1"><b>① 日次締め（精算）</b><span>売上・客数が出る画面</span><input type="file" accept="image/*" capture="environment" data-kind="日次締め"></label>
-      <label class="ph" id="ph2"><b>② 部門別売上</b><span>部門の金額が出る画面</span><input type="file" accept="image/*" capture="environment" data-kind="部門別売上"></label>
-      <label class="ph" id="ph3"><b>③ 商品別売上</b><span>商品と点数が出る画面</span><input type="file" accept="image/*" capture="environment" data-kind="商品別売上"></label>
-      <label class="ph" id="ph4"><b>③-2 商品別（続き）</b><span>スクロールが要るとき</span><input type="file" accept="image/*" capture="environment" data-kind="商品別売上2"></label>
-      <label class="ph only-terras" id="ph5"><b>④ 閉店時の陳列棚</b><span>残り物が分かるように</span><input type="file" accept="image/*" capture="environment" data-kind="陳列棚"></label>
+      <label class="ph" id="phDaily"><b>① 日次締め（精算）</b><span>純売上・客数が出る画面</span><input type="file" accept="image/*" capture="environment" id="inDaily"></label>
+      <label class="ph" id="phCat"><b>② カテゴリ別</b><span>ドリンクの杯数が出る画面</span><input type="file" accept="image/*" capture="environment" id="inCat"></label>
     </div>
-    <p class="hint">写真は端末内で縮小してから送ります（1枚あたり数百KB）。</p>
+    <p class="lab">③ 商品別売上 <small>（フェア・食パン・物販が写るように。何枚でも）</small></p>
+    <label class="ph" style="min-height:56px"><b>＋ 商品別の写真を追加</b><input type="file" accept="image/*" capture="environment" id="inItems"></label>
+    <div class="thumbs" id="itemThumbs"></div>
+    <p class="hint">写真は端末内で縮小してから送ります。数字は写真から自動で読み取ります。</p>
   </div>
 
-  <div class="card only-terras">
-    <p class="q">廃棄・値引きの点数</p>
-    <div class="chips" data-name="waste" data-single="1">
-      <span class="chip">0</span><span class="chip">1〜5</span><span class="chip">6〜10</span><span class="chip">11〜20</span><span class="chip">21以上</span>
-    </div>
-    <p class="q" style="margin-top:12px">完売した商品 <small>複数可</small></p>
-    <div class="chips" data-name="soldout">
-      <span class="chip">クロワッサン</span><span class="chip">食パン</span><span class="chip">カレーパン</span><span class="chip">メロンパン</span><span class="chip">サンド</span><span class="chip">デニッシュ</span><span class="chip">焼き菓子</span><span class="chip">その他</span>
-    </div>
-    <p class="q" style="margin-top:12px">完売した時間帯</p>
-    <div class="chips" data-name="soldoutTime" data-single="1">
-      <span class="chip">午前</span><span class="chip">13時まで</span><span class="chip">15時まで</span><span class="chip">閉店前</span><span class="chip">完売なし</span>
-    </div>
-  </div>
-
-  <div class="card only-rakushoin">
-    <p class="q">アフタヌーンティーの組数</p>
-    <div class="chips" data-name="afternoon" data-single="1">
-      <span class="chip">0</span><span class="chip">1</span><span class="chip">2</span><span class="chip">3以上</span>
-    </div>
-    <p class="q" style="margin-top:12px">予約の無断キャンセル</p>
-    <div class="chips" data-name="noshow" data-single="1">
-      <span class="chip">なし</span><span class="chip">あり</span>
-    </div>
-  </div>
+  <div id="dyn"></div>
 
   <div class="card">
-    <p class="q">お客様の声 <small>任意・3つまで</small></p>
-    <input type="text" id="v1" placeholder="例: 景色が素敵、家から30分歩いて来た" style="margin-bottom:8px">
-    <input type="text" id="v2" placeholder="" style="margin-bottom:8px">
-    <input type="text" id="v3" placeholder="">
-  </div>
-
-  <div class="card">
-    <p class="q">今日の気づき <small>任意・1行</small></p>
-    <textarea id="kizuki" placeholder="困ったこと、気になったこと、提案など"></textarea>
-    <div class="hide" id="nameBox" style="margin-top:10px"><p class="q">お名前</p><input type="text" id="name" placeholder="LINEの名前を取得できないときだけ"></div>
+    <p class="q">コメント</p>
+    <p class="lab">担当の持ち場</p>
+    <div class="chips" data-name="role" data-single="1"><span class="chip">ホール</span><span class="chip">キッチン</span><span class="chip">製造</span></div>
+    <p class="lab">お客様の声（ポジティブ）</p><textarea id="cPos" placeholder="例：カレーパンが揚げたてで良かった"></textarea>
+    <p class="lab">お客様の声（ネガティブ）</p><textarea id="cNeg" placeholder="例：贈答用の箱のサイズが合わない"></textarea>
+    <p class="lab">売上・販売に対して、自分が努力したこと</p><textarea id="cEffort"></textarea>
+    <p class="lab">次の出勤で目標にすること</p><textarea id="cNext"></textarea>
+    <div class="hide" id="nameBox" style="margin-top:10px"><p class="lab">お名前</p><input type="text" id="name" placeholder="LINEの名前を取得できないときだけ"></div>
     <p class="err" id="err"></p>
   </div>
 </div>
@@ -119,59 +99,117 @@
 <script>
   var LIFF_ID = '2011853204-GVDc6N2x';
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
+  var CONFIG = {}, LAST_REVIEW = {}, STORE = '';
   var profile = { userId: '', displayName: '' };
-  var photos = {};
+  var photoDaily = null, photoCat = null, photoItems = [];
+
+  function el(tag, attrs, kids) { var e = document.createElement(tag); for (var k in (attrs || {})) { if (k === 'text') e.textContent = attrs[k]; else if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); } (kids || []).forEach(function (c) { if (c) e.appendChild(c); }); return e; }
 
   // chips
-  document.querySelectorAll('.chips').forEach(function (g) {
-    g.addEventListener('click', function (e) {
-      var c = e.target.closest('.chip'); if (!c) return;
-      if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); }
-      else c.classList.toggle('on');
-      if (g.dataset.name === 'store') applyStore();
-    });
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest('.chip'); if (!c) return;
+    var g = c.parentElement;
+    if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); } else c.classList.toggle('on');
+    if (g.id === 'storeChips') { STORE = c.textContent.trim(); renderDyn(); }
   });
-  function val(name) {
-    var g = document.querySelector('.chips[data-name="' + name + '"]'); if (!g) return '';
-    var on = Array.prototype.slice.call(g.querySelectorAll('.chip.on')).map(function (x) { return x.textContent.trim(); });
-    return g.dataset.single ? (on[0] || '') : on;
-  }
-  function applyStore() {
-    var s = val('store');
-    document.querySelectorAll('.only-terras').forEach(function (el) { el.style.display = /TERRAS/.test(s) ? '' : 'none'; });
-    document.querySelectorAll('.only-rakushoin').forEach(function (el) { el.style.display = s === '楽書院' ? '' : 'none'; });
-  }
-  applyStore();
+  function val(name) { var g = document.querySelector('.chips[data-name="' + name + '"]'); var on = g && g.querySelector('.chip.on'); return on ? on.textContent.trim() : ''; }
 
-  // photos: resize to 1280px JPEG
-  document.querySelectorAll('.ph input').forEach(function (inp) {
-    inp.addEventListener('change', function () {
-      var f = inp.files && inp.files[0]; if (!f) return;
-      var kind = inp.dataset.kind, box = inp.closest('.ph');
-      var img = new Image(); var url = URL.createObjectURL(f);
-      img.onload = function () {
-        var max = 1280, w = img.width, h = img.height, r = Math.min(1, max / Math.max(w, h));
-        var c = document.createElement('canvas'); c.width = Math.round(w * r); c.height = Math.round(h * r);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        var dataUrl = c.toDataURL('image/jpeg', 0.82);
-        photos[kind] = { name: kind, dataUrl: dataUrl };
-        box.classList.add('ok');
-        var old = box.querySelector('img'); if (old) old.remove();
-        var pv = document.createElement('img'); pv.src = dataUrl; box.insertBefore(pv, box.firstChild);
-        URL.revokeObjectURL(url);
-      };
-      img.src = url;
+  // 店舗設定を読み込む
+  fetch(API_URL + '?action=config').then(function (r) { return r.json(); }).then(function (j) {
+    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {};
+    var box = document.getElementById('storeChips'); box.innerHTML = ''; box.dataset.single = '1';
+    Object.keys(CONFIG).forEach(function (s) { box.appendChild(el('span', { class: 'chip', text: s })); });
+    if (!Object.keys(CONFIG).length) box.appendChild(el('span', { class: 'loading', text: '店舗の設定がありません（日報設定シートを確認）' }));
+  }).catch(function () { document.getElementById('storeChips').innerHTML = '<span class="loading">店舗の設定を読み込めませんでした。電波の良いところで開き直してください。</span>'; });
+
+  // 店舗ごとの入力欄
+  function renderDyn() {
+    var dyn = document.getElementById('dyn'); dyn.innerHTML = '';
+    var cfg = CONFIG[STORE] || [];
+    var mfgItems = cfg.filter(function (c) { return c.type === '商品' && c.mfg; });
+    var nums = cfg.filter(function (c) { return c.type === '数値'; });
+    var ars = cfg.filter(function (c) { return c.type === '売掛'; });
+    var rv = cfg.filter(function (c) { return c.type === '口コミ'; })[0];
+    var texts = cfg.filter(function (c) { return c.type === '記述'; });
+    var auto = cfg.filter(function (c) { return c.type === '指標' || c.type === '商品'; }).map(function (c) { return c.name; });
+    if (auto.length) dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: '写真から自動で読む数字' }), el('p', { class: 'hint', text: auto.join('・') })]));
+    if (nums.length) {
+      var c1 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '数の入力' })]);
+      var lastSec = '';
+      nums.forEach(function (c) {
+        if (c.section !== lastSec) { c1.appendChild(el('p', { class: 'lab', text: c.section })); lastSec = c.section; }
+        var inp = el('input', { type: 'number', inputmode: 'numeric', 'data-num': c.name, min: '0' });
+        c1.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + c.unit + '）' }), inp]));
+      });
+      dyn.appendChild(c1);
+    }
+    if (mfgItems.length) {
+      var c2 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '製造数' }), el('p', { class: 'hint', text: '販売数は写真から読みます。ここには今日の製造数を入れてください。' })]);
+      mfgItems.forEach(function (c) {
+        var inp = el('input', { type: 'number', inputmode: 'numeric', 'data-mfg': c.name, min: '0' });
+        c2.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + c.unit + '）' }), inp]));
+      });
+      dyn.appendChild(c2);
+    }
+    if (ars.length) {
+      var c3 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '売掛' }), el('p', { class: 'hint', text: 'あった分だけ入力' })]);
+      ars.forEach(function (c) {
+        c3.appendChild(el('p', { class: 'lab', text: c.name }));
+        c3.appendChild(el('div', { class: 'row2' }, [el('input', { type: 'text', placeholder: '内容', 'data-ar': c.name, 'data-f': 'content' }), el('input', { type: 'number', inputmode: 'numeric', placeholder: '金額', 'data-ar': c.name, 'data-f': 'amount' })]));
+      });
+      dyn.appendChild(c3);
+    }
+    if (rv) {
+      var last = LAST_REVIEW[STORE];
+      dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: rv.section }),
+        el('div', { class: 'row' }, [el('label', { text: '声かけした人数' }), el('input', { type: 'number', inputmode: 'numeric', id: 'rvAsked', min: '0' })]),
+        el('div', { class: 'row' }, [el('label', { text: '口コミの件数（いまの累計）' }), el('input', { type: 'number', inputmode: 'numeric', id: 'rvTotal', min: '0' })]),
+        el('p', { class: 'hint', text: typeof last === 'number' ? '前回の日報では ' + last + ' 件。増えた数は自動で計算します。' : '増えた数は前回の日報から自動で計算します。' })]));
+    }
+    texts.forEach(function (c) {
+      dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: c.section }), el('textarea', { 'data-text': c.name })]));
     });
+  }
+
+  // 写真（1280px の JPEG に縮小）
+  function shrink(file, cb) {
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function () {
+      var max = 1280, r = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); cb(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = url;
+  }
+  function single(inputId, boxId, set) {
+    document.getElementById(inputId).addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      shrink(f, function (d) { set(d); var box = document.getElementById(boxId); box.classList.add('ok'); var old = box.querySelector('img'); if (old) old.remove(); var pv = document.createElement('img'); pv.src = d; box.insertBefore(pv, box.firstChild); });
+    });
+  }
+  single('inDaily', 'phDaily', function (d) { photoDaily = d; });
+  single('inCat', 'phCat', function (d) { photoCat = d; });
+  document.getElementById('inItems').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    shrink(f, function (d) { photoItems.push(d); drawThumbs(); e.target.value = ''; });
   });
+  function drawThumbs() {
+    var t = document.getElementById('itemThumbs'); t.innerHTML = '';
+    photoItems.forEach(function (d, i) {
+      var b = el('button', { type: 'button', 'aria-label': '削除', text: '×' }); b.onclick = function () { photoItems.splice(i, 1); drawThumbs(); };
+      var im = el('img', { src: d, alt: '商品別' + (i + 1) });
+      t.appendChild(el('div', { class: 'thumb' }, [im, b]));
+    });
+  }
 
   // LIFF
   (function initLiff() {
     var who = document.getElementById('who');
-    if (!LIFF_ID || typeof liff === 'undefined') { who.textContent = 'テストモード（LINE未接続）'; document.getElementById('nameBox').classList.remove('hide'); return; }
+    if (typeof liff === 'undefined') { who.textContent = 'LINE の外で開いています'; document.getElementById('nameBox').classList.remove('hide'); return; }
     liff.init({ liffId: LIFF_ID }).then(function () {
       if (!liff.isLoggedIn()) { liff.login(); return; }
       return liff.getProfile().then(function (p) { profile = { userId: p.userId, displayName: p.displayName }; who.textContent = '送信者：' + p.displayName; });
-    }).catch(function (e) { who.textContent = 'LINE情報を取得できませんでした（名前を入力してください）'; document.getElementById('nameBox').classList.remove('hide'); });
+    }).catch(function () { who.textContent = 'LINE の情報を取得できませんでした（名前を入力してください）'; document.getElementById('nameBox').classList.remove('hide'); });
   })();
 
   // 送信後、開いたトークに「#ID」を投稿 → ボットがその投稿に返信して日報を流す（返信は無料）
@@ -179,43 +217,46 @@
     var note = document.getElementById('doneNote');
     var ctx = null; try { ctx = (typeof liff !== 'undefined' && liff.getContext) ? liff.getContext() : null; } catch (e) {}
     var type = ctx && ctx.type;
-    if (!id || !LIFF_ID || !type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。LINE のトークから開くと、日報がトークに流れます。'; return; }
+    if (!id || !type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。LINE のトークから開くと、日報がトークに流れます。'; return; }
     liff.sendMessages([{ type: 'text', text: '日報を送信しました：' + store + '（#' + id + '）' }]).then(function () {
       note.textContent = type === 'utou' ? 'お疲れさまでした。この日報はあなたのトークにだけ届きます。グループ全員に流すときは、グループのトークから開いて送信してください。' : 'お疲れさまでした。数秒でグループに日報が流れます。この画面は閉じてかまいません。';
     }).catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。日報は保存されています。'; });
   }
 
-  // send
+  // 送信
   document.getElementById('send').addEventListener('click', function () {
     var err = document.getElementById('err'); err.textContent = '';
-    var store = val('store');
-    if (!store) { err.textContent = '店舗を選んでください'; return; }
+    if (!STORE) { err.textContent = '店舗を選んでください'; return; }
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
-    if (!photos['日次締め']) { err.textContent = '①日次締めの写真を撮ってください'; return; }
+    if (!photoDaily) { err.textContent = '①日次締めの写真を撮ってください'; return; }
+    var mfg = {}, nums = {}, texts = {}, arMap = {};
+    document.querySelectorAll('[data-mfg]').forEach(function (i) { if (i.value !== '') mfg[i.dataset.mfg] = Number(i.value); });
+    document.querySelectorAll('[data-num]').forEach(function (i) { if (i.value !== '') nums[i.dataset.num] = Number(i.value); });
+    document.querySelectorAll('[data-text]').forEach(function (i) { if (i.value.trim()) texts[i.dataset.text] = i.value.trim(); });
+    document.querySelectorAll('[data-ar]').forEach(function (i) { var a = arMap[i.dataset.ar] = arMap[i.dataset.ar] || { name: i.dataset.ar }; if (i.value !== '') a[i.dataset.f] = i.dataset.f === 'amount' ? Number(i.value) : i.value.trim(); });
+    var rvA = document.getElementById('rvAsked'), rvT = document.getElementById('rvTotal');
+    var photos = [{ name: '日次締め', dataUrl: photoDaily }];
+    if (photoCat) photos.push({ name: 'カテゴリ別', dataUrl: photoCat });
+    photoItems.forEach(function (d, i) { photos.push({ name: '商品別' + (i + 1), dataUrl: d }); });
     var payload = {
-      store: store, weather: val('weather'),
-      voices: [document.getElementById('v1').value, document.getElementById('v2').value, document.getElementById('v3').value],
-      kizuki: document.getElementById('kizuki').value,
-      waste: /TERRAS/.test(store) ? val('waste') : '', soldout: /TERRAS/.test(store) ? val('soldout') : [], soldoutTime: /TERRAS/.test(store) ? val('soldoutTime') : '',
-      afternoon: store === '楽書院' ? val('afternoon') : '', noshow: store === '楽書院' ? val('noshow') : '',
-      photos: Object.keys(photos).map(function (k) { return photos[k]; }),
-      name: document.getElementById('name').value,
-      liff: profile
+      store: STORE, weather: val('weather'), photos: photos, mfg: mfg, nums: nums, texts: texts,
+      ar: Object.keys(arMap).map(function (k) { return arMap[k]; }),
+      review: { asked: rvA && rvA.value !== '' ? Number(rvA.value) : '', total: rvT && rvT.value !== '' ? Number(rvT.value) : '' },
+      comments: { role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim(), effort: document.getElementById('cEffort').value.trim(), next: document.getElementById('cNext').value.trim() },
+      name: document.getElementById('name').value
     };
-    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（写真を保存して数字を読み取っています）';
+    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（写真から数字を読み取っています）';
     var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
     fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'submit', token: token, payload: payload }) })
       .then(function (res) { return res.json(); })
-      .then(function (r) { if (!r || !r.ok) throw new Error((r && r.error) || '送信できませんでした'); return r; })
       .then(function (r) {
-      document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
-      document.getElementById('result').classList.remove('hide');
-      document.getElementById('preview').textContent = r.message;
-      postToChat(store, r.id);
+        if (!r || !r.ok) throw new Error((r && r.error) || '送信できませんでした');
+        document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
+        document.getElementById('result').classList.remove('hide');
+        document.getElementById('preview').textContent = r.message;
+        postToChat(STORE, r.id);
       })
-      .catch(function (e) {
-        btn.disabled = false; btn.textContent = '送信する'; err.textContent = '送信に失敗しました: ' + e.message;
-      });
+      .catch(function (e) { btn.disabled = false; btn.textContent = '送信する'; err.textContent = '送信に失敗しました: ' + e.message; });
   });
 </script>
 </body>
