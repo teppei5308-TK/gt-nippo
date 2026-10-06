@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>営業日報</title>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#23262b;--muted:#6f757d;--line:#dcd8cf;--acc:#5E7A4A;--acc2:#2F4858;--warn:#8F6A1C}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:16px;line-height:1.6}
+  .wrap{max-width:560px;margin:0 auto;padding:14px 14px 90px}
+  h1{font-size:18px;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+  .q{font-weight:700;font-size:14px;margin:0 0 8px}
+  .q small{font-weight:400;color:var(--muted);margin-left:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:8px 14px;background:#fff;font-size:15px}
+  .chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .photo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ph{border:1.5px dashed var(--line);border-radius:10px;padding:10px;text-align:center;font-size:13px;color:var(--muted);position:relative;min-height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#fff}
+  .ph.ok{border-style:solid;border-color:var(--acc);color:var(--acc)}
+  .ph img{width:100%;height:84px;object-fit:cover;border-radius:6px}
+  .ph input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
+  .ph b{font-size:13px;color:var(--ink)}
+  input[type=text],input[type=number],textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;background:#fff}
+  textarea{min-height:44px;resize:vertical}
+  .row{display:flex;gap:8px;margin-bottom:8px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+  button.send{width:100%;max-width:532px;display:block;margin:0 auto;background:var(--acc2);color:#fff;border:0;border-radius:10px;padding:14px;font-size:17px;font-weight:700}
+  button.send:disabled{opacity:.5}
+  .done{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}
+  .err{color:#9E3F33;font-size:13px;margin-top:6px}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap" id="form">
+  <h1>営業日報</h1>
+  <p class="sub" id="who">送信者を確認しています…</p>
+
+  <div class="card">
+    <p class="q">店舗</p>
+    <div class="chips" data-name="store" data-single="1">
+      <span class="chip">楽書院</span><span class="chip">TERRAS 本店</span><span class="chip">TERRAS 2ND</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="q">天気</p>
+    <div class="chips" data-name="weather" data-single="1">
+      <span class="chip">☀</span><span class="chip">☁</span><span class="chip">☂</span><span class="chip">☃</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="q">レジ画面の写真 <small>タップして撮影</small></p>
+    <div class="photo">
+      <label class="ph" id="ph1"><b>① 日次締め（精算）</b><span>売上・客数が出る画面</span><input type="file" accept="image/*" capture="environment" data-kind="日次締め"></label>
+      <label class="ph" id="ph2"><b>② 部門別売上</b><span>部門の金額が出る画面</span><input type="file" accept="image/*" capture="environment" data-kind="部門別売上"></label>
+      <label class="ph" id="ph3"><b>③ 商品別売上</b><span>商品と点数が出る画面</span><input type="file" accept="image/*" capture="environment" data-kind="商品別売上"></label>
+      <label class="ph" id="ph4"><b>③-2 商品別（続き）</b><span>スクロールが要るとき</span><input type="file" accept="image/*" capture="environment" data-kind="商品別売上2"></label>
+      <label class="ph only-terras" id="ph5"><b>④ 閉店時の陳列棚</b><span>残り物が分かるように</span><input type="file" accept="image/*" capture="environment" data-kind="陳列棚"></label>
+    </div>
+    <p class="hint">写真は端末内で縮小してから送ります（1枚あたり数百KB）。</p>
+  </div>
+
+  <div class="card only-terras">
+    <p class="q">廃棄・値引きの点数</p>
+    <div class="chips" data-name="waste" data-single="1">
+      <span class="chip">0</span><span class="chip">1〜5</span><span class="chip">6〜10</span><span class="chip">11〜20</span><span class="chip">21以上</span>
+    </div>
+    <p class="q" style="margin-top:12px">完売した商品 <small>複数可</small></p>
+    <div class="chips" data-name="soldout">
+      <span class="chip">クロワッサン</span><span class="chip">食パン</span><span class="chip">カレーパン</span><span class="chip">メロンパン</span><span class="chip">サンド</span><span class="chip">デニッシュ</span><span class="chip">焼き菓子</span><span class="chip">その他</span>
+    </div>
+    <p class="q" style="margin-top:12px">完売した時間帯</p>
+    <div class="chips" data-name="soldoutTime" data-single="1">
+      <span class="chip">午前</span><span class="chip">13時まで</span><span class="chip">15時まで</span><span class="chip">閉店前</span><span class="chip">完売なし</span>
+    </div>
+  </div>
+
+  <div class="card only-rakushoin">
+    <p class="q">アフタヌーンティーの組数</p>
+    <div class="chips" data-name="afternoon" data-single="1">
+      <span class="chip">0</span><span class="chip">1</span><span class="chip">2</span><span class="chip">3以上</span>
+    </div>
+    <p class="q" style="margin-top:12px">予約の無断キャンセル</p>
+    <div class="chips" data-name="noshow" data-single="1">
+      <span class="chip">なし</span><span class="chip">あり</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="q">お客様の声 <small>任意・3つまで</small></p>
+    <input type="text" id="v1" placeholder="例: 景色が素敵、家から30分歩いて来た" style="margin-bottom:8px">
+    <input type="text" id="v2" placeholder="" style="margin-bottom:8px">
+    <input type="text" id="v3" placeholder="">
+  </div>
+
+  <div class="card">
+    <p class="q">今日の気づき <small>任意・1行</small></p>
+    <textarea id="kizuki" placeholder="困ったこと、気になったこと、提案など"></textarea>
+    <div class="hide" id="nameBox" style="margin-top:10px"><p class="q">お名前</p><input type="text" id="name" placeholder="LINEの名前を取得できないときだけ"></div>
+    <p class="err" id="err"></p>
+  </div>
+</div>
+
+<div class="wrap hide" id="result">
+  <h1>送信しました</h1>
+  <p class="sub" id="doneNote">お疲れさまでした。</p>
+  <div class="done" id="preview"></div>
+</div>
+
+<div class="bar" id="bar"><button class="send" id="send">送信する</button></div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  var LIFF_ID = '2011853204-GVDc6N2x';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
+  var profile = { userId: '', displayName: '' };
+  var photos = {};
+
+  // chips
+  document.querySelectorAll('.chips').forEach(function (g) {
+    g.addEventListener('click', function (e) {
+      var c = e.target.closest('.chip'); if (!c) return;
+      if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); }
+      else c.classList.toggle('on');
+      if (g.dataset.name === 'store') applyStore();
+    });
+  });
+  function val(name) {
+    var g = document.querySelector('.chips[data-name="' + name + '"]'); if (!g) return '';
+    var on = Array.prototype.slice.call(g.querySelectorAll('.chip.on')).map(function (x) { return x.textContent.trim(); });
+    return g.dataset.single ? (on[0] || '') : on;
+  }
+  function applyStore() {
+    var s = val('store');
+    document.querySelectorAll('.only-terras').forEach(function (el) { el.style.display = /TERRAS/.test(s) ? '' : 'none'; });
+    document.querySelectorAll('.only-rakushoin').forEach(function (el) { el.style.display = s === '楽書院' ? '' : 'none'; });
+  }
+  applyStore();
+
+  // photos: resize to 1280px JPEG
+  document.querySelectorAll('.ph input').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      var kind = inp.dataset.kind, box = inp.closest('.ph');
+      var img = new Image(); var url = URL.createObjectURL(f);
+      img.onload = function () {
+        var max = 1280, w = img.width, h = img.height, r = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas'); c.width = Math.round(w * r); c.height = Math.round(h * r);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        var dataUrl = c.toDataURL('image/jpeg', 0.82);
+        photos[kind] = { name: kind, dataUrl: dataUrl };
+        box.classList.add('ok');
+        var old = box.querySelector('img'); if (old) old.remove();
+        var pv = document.createElement('img'); pv.src = dataUrl; box.insertBefore(pv, box.firstChild);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
+  });
+
+  // LIFF
+  (function initLiff() {
+    var who = document.getElementById('who');
+    if (!LIFF_ID || typeof liff === 'undefined') { who.textContent = 'テストモード（LINE未接続）'; document.getElementById('nameBox').classList.remove('hide'); return; }
+    liff.init({ liffId: LIFF_ID }).then(function () {
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+      return liff.getProfile().then(function (p) { profile = { userId: p.userId, displayName: p.displayName }; who.textContent = '送信者：' + p.displayName; });
+    }).catch(function (e) { who.textContent = 'LINE情報を取得できませんでした（名前を入力してください）'; document.getElementById('nameBox').classList.remove('hide'); });
+  })();
+
+  // 送信後、開いたトークに「#ID」を投稿 → ボットがその投稿に返信して日報を流す（返信は無料）
+  function postToChat(store, id) {
+    var note = document.getElementById('doneNote');
+    var ctx = null; try { ctx = (typeof liff !== 'undefined' && liff.getContext) ? liff.getContext() : null; } catch (e) {}
+    var type = ctx && ctx.type;
+    if (!id || !LIFF_ID || !type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。LINE のトークから開くと、日報がトークに流れます。'; return; }
+    liff.sendMessages([{ type: 'text', text: '日報を送信しました：' + store + '（#' + id + '）' }]).then(function () {
+      note.textContent = type === 'utou' ? 'お疲れさまでした。この日報はあなたのトークにだけ届きます。グループ全員に流すときは、グループのトークから開いて送信してください。' : 'お疲れさまでした。数秒でグループに日報が流れます。この画面は閉じてかまいません。';
+    }).catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。日報は保存されています。'; });
+  }
+
+  // send
+  document.getElementById('send').addEventListener('click', function () {
+    var err = document.getElementById('err'); err.textContent = '';
+    var store = val('store');
+    if (!store) { err.textContent = '店舗を選んでください'; return; }
+    if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
+    if (!photos['日次締め']) { err.textContent = '①日次締めの写真を撮ってください'; return; }
+    var payload = {
+      store: store, weather: val('weather'),
+      voices: [document.getElementById('v1').value, document.getElementById('v2').value, document.getElementById('v3').value],
+      kizuki: document.getElementById('kizuki').value,
+      waste: /TERRAS/.test(store) ? val('waste') : '', soldout: /TERRAS/.test(store) ? val('soldout') : [], soldoutTime: /TERRAS/.test(store) ? val('soldoutTime') : '',
+      afternoon: store === '楽書院' ? val('afternoon') : '', noshow: store === '楽書院' ? val('noshow') : '',
+      photos: Object.keys(photos).map(function (k) { return photos[k]; }),
+      name: document.getElementById('name').value,
+      liff: profile
+    };
+    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（写真を保存して数字を読み取っています）';
+    var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'submit', token: token, payload: payload }) })
+      .then(function (res) { return res.json(); })
+      .then(function (r) { if (!r || !r.ok) throw new Error((r && r.error) || '送信できませんでした'); return r; })
+      .then(function (r) {
+      document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
+      document.getElementById('result').classList.remove('hide');
+      document.getElementById('preview').textContent = r.message;
+      postToChat(store, r.id);
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = '送信する'; err.textContent = '送信に失敗しました: ' + e.message;
+      });
+  });
+</script>
+</body>
+</html>
