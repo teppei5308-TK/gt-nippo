@@ -72,6 +72,13 @@
     <p class="hint">iPad のスクリーンショット（ホームボタン＋電源ボタン）を選ぶと、文字がはっきりして読み取りが正確です。写真で撮るときは画面に正面から。</p>
   </div>
 
+  <div class="card hide" id="prodCard">
+    <p class="q">製造表（紙） <small>表・裏の写真</small></p>
+    <label class="ph" style="min-height:56px"><b>＋ 製造表の写真を追加</b><span>表と裏の2枚（ページがあれば全部）</span><input type="file" accept="image/*" id="inProd"></label>
+    <div class="thumbs" id="prodThumbs"></div>
+    <p class="hint">紙全体が入るように、真上から明るい場所で撮ってください。残りの数は、その商品の行の「店頭残」の欄に書くと正確に読めます。売り切れは空欄のままで大丈夫です。</p>
+  </div>
+
   <div id="dyn"></div>
 
   <div class="card">
@@ -104,7 +111,8 @@
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
   var CONFIG = {}, LAST_REVIEW = {}, STORE = '';
   var profile = { userId: '', displayName: '' };
-  var photoDaily = null, photoCat = null, photoItems = [];
+  var photoDaily = null, photoCat = null, photoItems = [], photoProd = [];
+  var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
 
   function el(tag, attrs, kids) { var e = document.createElement(tag); for (var k in (attrs || {})) { if (k === 'text') e.textContent = attrs[k]; else if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); } (kids || []).forEach(function (c) { if (c) e.appendChild(c); }); return e; }
 
@@ -130,7 +138,9 @@
     var dyn = document.getElementById('dyn'); dyn.innerHTML = '';
     var cfg = CONFIG[STORE] || [];
     var mfgItems = cfg.filter(function (c) { return c.type === '商品' && c.mfg; });
-    var nums = cfg.filter(function (c) { return c.type === '数値'; });
+    var hasProd = cfg.some(function (c) { return c.type === '製造表'; });
+    document.getElementById('prodCard').classList.toggle('hide', !hasProd);
+    var nums = cfg.filter(function (c) { return c.type === '数値' && !(hasProd && PROD_NUMS.indexOf(c.name) >= 0); });
     var ars = cfg.filter(function (c) { return c.type === '売掛'; });
     var rv = cfg.filter(function (c) { return c.type === '口コミ'; })[0];
     var texts = cfg.filter(function (c) { return c.type === '記述'; });
@@ -139,6 +149,7 @@
     document.getElementById('defaultComments').style.display = cms.length ? 'none' : '';
     var cc = document.getElementById('customComments'); cc.innerHTML = '';
     cms.forEach(function (c) { cc.appendChild(el('p', { class: 'lab', text: c.section })); cc.appendChild(el('textarea', { 'data-cm': c.name })); });
+    if (hasProd) auto.push('製造表から：作った数・残り' + (cfg.some(function (c) { return c.name === '製造ミス'; }) ? '・製造ミス' : ''));
     if (auto.length) dyn.appendChild(el('div', { class: 'card' }, [el('p', { class: 'q', text: '写真から自動で読む数字' }), el('p', { class: 'hint', text: auto.join('・') })]));
     if (nums.length) {
       var c1 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '数の入力' })]);
@@ -186,10 +197,10 @@
   }
 
   // 写真（1280px の JPEG に縮小）
-  function shrink(file, cb) {
+  function shrink(file, cb, maxPx) {
     var img = new Image(), url = URL.createObjectURL(file);
     img.onload = function () {
-      var max = 1280, r = Math.min(1, max / Math.max(img.width, img.height));
+      var max = maxPx || 1280, r = Math.min(1, max / Math.max(img.width, img.height));
       var c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); cb(c.toDataURL('image/jpeg', 0.82));
     };
@@ -207,6 +218,18 @@
     var f = e.target.files && e.target.files[0]; if (!f) return;
     shrink(f, function (d) { photoItems.push(d); drawThumbs(); e.target.value = ''; });
   });
+  // 製造表は手書きの小さな数字を読むので大きめ（1568px）
+  document.getElementById('inProd').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    shrink(f, function (d) { photoProd.push(d); drawProd(); e.target.value = ''; }, 1568);
+  });
+  function drawProd() {
+    var t = document.getElementById('prodThumbs'); t.innerHTML = '';
+    photoProd.forEach(function (d, i) {
+      var b = el('button', { type: 'button', 'aria-label': '削除', text: '×' }); b.onclick = function () { photoProd.splice(i, 1); drawProd(); };
+      t.appendChild(el('div', { class: 'thumb' }, [el('img', { src: d, alt: '製造表' + (i + 1) }), b]));
+    });
+  }
   function drawThumbs() {
     var t = document.getElementById('itemThumbs'); t.innerHTML = '';
     photoItems.forEach(function (d, i) {
@@ -253,6 +276,7 @@
     var photos = [{ name: '日別売上', dataUrl: photoDaily }];
     if (photoCat) photos.push({ name: '販売商品（カテゴリ）', dataUrl: photoCat });
     photoItems.forEach(function (d, i) { photos.push({ name: '販売商品（商品ごと）' + (i + 1), dataUrl: d }); });
+    if (!document.getElementById('prodCard').classList.contains('hide')) photoProd.forEach(function (d, i) { photos.push({ name: '製造表' + (i + 1), dataUrl: d }); });
     var payload = {
       store: STORE, weather: val('weather'), photos: photos, mfg: mfg, nums: nums, texts: texts,
       ar: Object.keys(arMap).map(function (k) { return arMap[k]; }),
