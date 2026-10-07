@@ -40,6 +40,9 @@
   .done{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}
   .err{color:#9E3F33;font-size:13px;margin-top:6px}
   .hide{display:none}
+  .roww{display:grid;grid-template-columns:1fr 150px;gap:8px;align-items:center;margin-bottom:10px}
+  .roww label{font-size:15px}
+  .calc{font-size:20px;font-weight:700;margin:6px 0 0}
   .loading{color:var(--muted);font-size:14px}
 </style>
 </head>
@@ -114,6 +117,29 @@
   <p class="err" id="err"></p>
 </div>
 
+<div class="wrap hide" id="otForm">
+  <h1>残業の報告</h1>
+  <p class="sub" id="otWho">送信者を確認しています…</p>
+  <div class="card">
+    <div class="roww"><label>日付</label><input type="date" id="otDate"></div>
+    <div class="roww"><label>退勤時間</label><input type="time" id="otLeave"></div>
+    <div class="roww"><label>シフトの終わり</label><input type="time" id="otTeiji"></div>
+    <p class="calc" id="otCalc">残務　—</p>
+    <p class="hint">シフト表で、その日の退勤予定の時間を確認して入れてください。残務＝退勤時間−シフトの終わり。</p>
+  </div>
+  <div class="card">
+    <p class="q">休憩</p>
+    <div class="chips" id="otBreak" data-single="1"><span class="chip on">通常どおり</span><span class="chip">休憩なし</span></div>
+    <div id="otNbBox" class="hide"><p class="lab">休憩なしの理由</p><input type="text" id="otNbReason" placeholder="例：人員不足"></div>
+  </div>
+  <div class="card">
+    <p class="q">理由 <small>複数選べます</small></p>
+    <div class="chips" id="otReasons"><span class="chip">仕込み</span><span class="chip">翌日準備</span><span class="chip">片付け</span><span class="chip">厨房片付け</span><span class="chip">ホールフォロー</span><span class="chip">試作</span><span class="chip">催事準備</span><span class="chip">発注・事務</span></div>
+    <p class="lab">その他・詳しく</p><textarea id="otReasonText" placeholder="例：ハロウィン商品の試作"></textarea>
+  </div>
+  <p class="err" id="otErr"></p>
+</div>
+
 <div class="wrap hide" id="result">
   <h1>送信しました</h1>
   <p class="sub" id="doneNote">お疲れさまでした。</p>
@@ -125,6 +151,7 @@
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
   var LIFF_ID = '2011853204-GVDc6N2x';
+  var IS_OT = /mode(=|%3D)overtime/.test(location.search + location.hash);
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, STORE = '', MODE = '';
   var profile = { userId: '', displayName: '' };
@@ -291,7 +318,7 @@
     if (typeof liff === 'undefined') { who.textContent = 'LINE の外で開いています'; document.getElementById('nameBox').classList.remove('hide'); return; }
     liff.init({ liffId: LIFF_ID }).then(function () {
       if (!liff.isLoggedIn()) { liff.login(); return; }
-      return liff.getProfile().then(function (p) { profile = { userId: p.userId, displayName: p.displayName }; who.textContent = '送信者：' + p.displayName; });
+      return liff.getProfile().then(function (p) { profile = { userId: p.userId, displayName: p.displayName }; who.textContent = '送信者：' + p.displayName; document.getElementById('otWho').textContent = '報告者：' + p.displayName; });
     }).catch(function () { who.textContent = 'LINE の情報を取得できませんでした（名前を入力してください）'; document.getElementById('nameBox').classList.remove('hide'); });
   })();
 
@@ -304,6 +331,55 @@
     liff.sendMessages([{ type: 'text', text: '日報を送信しました：' + store + '（#' + id + '）' }]).then(function () {
       note.textContent = type === 'utou' ? 'お疲れさまでした。この日報はあなたのトークにだけ届きます。グループ全員に流すときは、グループのトークから開いて送信してください。' : 'お疲れさまでした。数秒でグループに日報が流れます。この画面は閉じてかまいません。';
     }).catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。日報は保存されています。'; });
+  }
+
+  // ---------- 残業の報告 ----------
+  function pad2(n) { return ('0' + n).slice(-2); }
+  function tmin(t) { var m = String(t || '').match(/(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+  function otCalc() {
+    var a = tmin(document.getElementById('otLeave').value), b = tmin(document.getElementById('otTeiji').value), el = document.getElementById('otCalc');
+    if (a === null || b === null) { el.textContent = '残務　—'; return null; }
+    var m = Math.max(0, a - b); el.textContent = '残務　' + (Math.floor(m / 60) ? Math.floor(m / 60) + '時間' : '') + (m % 60) + '分'; return m;
+  }
+  if (IS_OT) {
+    document.getElementById('form').classList.add('hide'); document.getElementById('otForm').classList.remove('hide');
+    document.title = '残業の報告'; document.getElementById('send').textContent = '残業を報告する';
+    var now = new Date();
+    document.getElementById('otDate').value = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
+    document.getElementById('otLeave').value = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    ['otLeave', 'otTeiji'].forEach(function (id) { document.getElementById(id).addEventListener('input', otCalc); });
+    document.getElementById('otBreak').addEventListener('click', function () { setTimeout(function () {
+      var on = document.querySelector('#otBreak .chip.on'); document.getElementById('otNbBox').classList.toggle('hide', !(on && on.textContent === '休憩なし')); }, 0); });
+    otCalc();
+  }
+  function sendOT() {
+    var err = document.getElementById('otErr'); err.textContent = '';
+    var leave = document.getElementById('otLeave').value, teiji = document.getElementById('otTeiji').value, m = otCalc();
+    if (!leave) { err.textContent = '退勤時間を入れてください'; return; }
+    if (!teiji) { err.textContent = 'シフトの終わりの時間を入れてください（シフト表で確認）'; return; }
+    var rs = [].map.call(document.querySelectorAll('#otReasons .chip.on'), function (c) { return c.textContent; });
+    var extra = document.getElementById('otReasonText').value.trim(); if (extra) rs.push(extra);
+    if (!rs.length) { err.textContent = '理由を1つ以上選ぶか、書いてください'; return; }
+    var nb = document.querySelector('#otBreak .chip.on'); nb = !!(nb && nb.textContent === '休憩なし');
+    var payload = { date: document.getElementById('otDate').value, leave: leave, teiji: teiji, noBreak: nb, noBreakReason: nb ? document.getElementById('otNbReason').value.trim() : '', reason: rs.join('、'), name: document.getElementById('name').value };
+    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…';
+    var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'overtime', token: token, payload: payload }) })
+      .then(function (res) { return res.json(); })
+      .then(function (r) {
+        if (!r || !r.ok) throw new Error((r && r.error) || '送信できませんでした');
+        document.getElementById('otForm').classList.add('hide'); document.getElementById('bar').classList.add('hide');
+        document.getElementById('result').classList.remove('hide');
+        document.querySelector('#result h1').textContent = '報告しました';
+        document.getElementById('preview').textContent = r.message;
+        var note = document.getElementById('doneNote'), ctx = null; try { ctx = liff.getContext(); } catch (e) {}
+        var type = ctx && ctx.type;
+        if (!type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。LINE のトークから開くと、報告がトークに流れます。'; return; }
+        liff.sendMessages([{ type: 'text', text: '残業報告を送信しました（#' + r.id + '）' }]).then(function () {
+          note.textContent = type === 'utou' ? 'お疲れさまでした。この報告はあなたのトークにだけ届きます。グループに流すときは、グループのトークから開いて送信してください。' : 'お疲れさまでした。数秒でグループに報告が流れます。';
+        }).catch(function () { note.textContent = 'お疲れさまでした。報告は保存されています。'; });
+      })
+      .catch(function (e) { btn.disabled = false; btn.textContent = '残業を報告する'; err.textContent = '送信に失敗しました: ' + e.message; });
   }
 
   // 製造・早番の途中登録
@@ -344,6 +420,7 @@
 
   // 送信
   document.getElementById('send').addEventListener('click', function () {
+    if (IS_OT) { sendOT(); return; }
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
     if (!MODE) { err.textContent = '登録する内容（締め・製造・早番）を選んでください'; return; }
