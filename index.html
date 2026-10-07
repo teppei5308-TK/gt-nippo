@@ -43,6 +43,16 @@
   .roww{display:grid;grid-template-columns:1fr 150px;gap:8px;align-items:center;margin-bottom:10px}
   .roww label{font-size:15px}
   .calc{font-size:20px;font-weight:700;margin:6px 0 0}
+  .cl-h{font-size:13px;font-weight:700;color:var(--muted);margin:14px 2px 6px}
+  .cl{display:grid;grid-template-columns:40px 1fr 44px;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
+  .cl.on{border-color:var(--acc);background:#f1f5ee}
+  .cl .ck{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;cursor:pointer}
+  .cl.on .ck{background:var(--acc);border-color:var(--acc)}
+  .cl .nm{font-size:15px;line-height:1.4;cursor:pointer}
+  .cl .nm small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .cl .cam{position:relative;width:44px;height:44px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
+  .cl .cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .cl .cam input{position:absolute;inset:0;opacity:0}
   .loading{color:var(--muted);font-size:14px}
 </style>
 </head>
@@ -58,12 +68,20 @@
 
   <div class="card">
     <p class="q">登録する内容</p>
-    <div class="chips" id="modeChips"><span class="chip" data-mode="締め">締め（日報を完成）</span><span class="chip" data-mode="製造">製造</span><span class="chip" data-mode="早番">早番・途中で上がる</span></div>
+    <div class="chips" id="modeChips"><span class="chip" data-mode="締め">締め（日報を完成）</span><span class="chip" data-mode="製造">製造</span><span class="chip" data-mode="早番">早番・途中で上がる</span><span class="chip" data-mode="清掃">清掃（HACCP）</span></div>
     <p class="hint" id="modeHint">製造・早番の人は自分の分だけ登録してください。締めの人が送ると、全部まとめて1本の日報になります。</p>
   </div>
 
   <div id="main" class="hide">
   <div class="card hide" id="partsCard"></div>
+  <div class="hide" id="cleanBox">
+    <div class="card">
+      <p class="q">場所</p>
+      <div class="chips" id="cleanArea" data-single="1"><span class="chip">厨房</span><span class="chip">ホール</span></div>
+      <p class="hint">終わった場所を押して ✓ にしてください。写真は任意（📷 を押す）。チェックポイントを満たしたら完了です。</p>
+    </div>
+    <div id="cleanList"></div>
+  </div>
 
   <div class="card" id="weatherCard">
     <p class="q">天気</p>
@@ -153,7 +171,7 @@
   var LIFF_ID = '2011853204-GVDc6N2x';
   var IS_OT = /mode(=|%3D)overtime/.test(location.search + location.hash);
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
-  var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, STORE = '', MODE = '';
+  var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };
   var photoDaily = null, photoCat = null, photoItems = [], photoProd = [];
   var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
@@ -167,12 +185,13 @@
     if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); } else c.classList.toggle('on');
     if (g.id === 'storeChips') { STORE = c.textContent.trim(); renderDyn(); }
     if (g.id === 'modeChips') { MODE = c.dataset.mode; renderDyn(); }
+    if (g.id === 'cleanArea') { CL_AREA = c.textContent.trim(); renderClean(); }
   });
   function val(name) { var g = document.querySelector('.chips[data-name="' + name + '"]'); var on = g && g.querySelector('.chip.on'); return on ? on.textContent.trim() : ''; }
 
   // 店舗設定を読み込む
   fetch(API_URL + '?action=config').then(function (r) { return r.json(); }).then(function (j) {
-    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {}; DENGON = j.dengon || {}; PARTS = j.parts || {};
+    CONFIG = j.stores || {}; LAST_REVIEW = j.lastReview || {}; DENGON = j.dengon || {}; PARTS = j.parts || {}; CLEAN = j.cleaning || {};
     document.getElementById('modeChips').dataset.single = '1';
     var box = document.getElementById('storeChips'); box.innerHTML = ''; box.dataset.single = '1';
     Object.keys(CONFIG).forEach(function (s) { box.appendChild(el('span', { class: 'chip', text: s })); });
@@ -184,7 +203,12 @@
     var dyn = document.getElementById('dyn'); dyn.innerHTML = '';
     var cfg = CONFIG[STORE] || [];
     var show = function (id, on) { document.getElementById(id).classList.toggle('hide', !on); };
-    var CLOSE = MODE === '締め', MAKE = MODE === '製造', EARLY = MODE === '早番';
+    var CLOSE = MODE === '締め', MAKE = MODE === '製造', EARLY = MODE === '早番', CLEANM = MODE === '清掃';
+    show('cleanBox', CLEANM);
+    if (CLEANM) {
+      show('main', !!STORE); ['weatherCard', 'regiCard', 'noteCard', 'commentCard', 'partsCard', 'prodCard'].forEach(function (id) { show(id, false); });
+      document.getElementById('send').textContent = '清掃を記録する'; renderClean(); return;
+    }
     show('main', !!(STORE && MODE));
     show('weatherCard', CLOSE); show('regiCard', CLOSE); show('noteCard', MAKE); show('commentCard', !MAKE); show('effortBox', CLOSE);
     document.getElementById('send').textContent = CLOSE ? '日報を送信する' : (MODE ? MODE + 'の分を登録する' : '送信する');
@@ -333,6 +357,60 @@
     }).catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。日報は保存されています。'; });
   }
 
+  // ---------- 清掃チェック ----------
+  function renderClean() {
+    var box = document.getElementById('cleanList'); box.innerHTML = '';
+    var cfg = CLEAN[STORE];
+    if (!cfg) { box.appendChild(el('p', { class: 'hint', text: 'この店舗の清掃チェック表はまだありません。' })); return; }
+    if (!CL_AREA) { box.appendChild(el('p', { class: 'hint', text: '厨房かホールを選んでください。' })); return; }
+    var items = cfg.items.filter(function (x) { return x.area === CL_AREA && x.need > 0; });
+    var g = { plan: [], rest: [], done: [] };
+    items.forEach(function (x) { var left = x.done.length < x.need;
+      if (left && x.days.indexOf(cfg.today) >= 0) g.plan.push(x); else if (left) g.rest.push(x); else g.done.push(x); });
+    [['plan', '今日の予定'], ['rest', '今週まだ'], ['done', '今週済み']].forEach(function (sec) {
+      if (!g[sec[0]].length) return;
+      box.appendChild(el('p', { class: 'cl-h', text: sec[1] + '（' + g[sec[0]].length + '）' }));
+      g[sec[0]].forEach(function (x) {
+        var key = x.area + '|' + x.item, sel = CL_SEL[key];
+        var sub = x.freq + '・今週 ' + x.done.length + '/' + x.need + '回' + (x.done.length ? '（' + x.done.join('・') + '）' : '') + (x.days.length ? '・予定 ' + x.days.join('・') : '');
+        var row = el('div', { class: 'cl' + (sel ? ' on' : '') });
+        var ck = el('div', { class: 'ck', text: '✓' }), nm = el('div', { class: 'nm' }, [document.createTextNode(x.item), el('small', { text: sub }), el('small', { text: '基準：' + x.point })]);
+        var cam = el('label', { class: 'cam' }), inp = el('input', { type: 'file', accept: 'image/*' });
+        cam.appendChild(document.createTextNode('📷'));
+        if (sel && sel.photo) cam.appendChild(el('img', { src: sel.photo, alt: '' }));
+        cam.appendChild(inp);
+        var toggle = function () { if (CL_SEL[key]) delete CL_SEL[key]; else CL_SEL[key] = { item: x.item, photo: '' }; renderClean(); };
+        ck.onclick = toggle; nm.onclick = toggle;
+        inp.onchange = function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; shrink(f, function (d) { CL_SEL[key] = { item: x.item, photo: d }; renderClean(); }); };
+        row.appendChild(ck); row.appendChild(nm); row.appendChild(cam); box.appendChild(row);
+      });
+    });
+  }
+  function sendClean() {
+    var err = document.getElementById('err'); err.textContent = '';
+    if (!CL_AREA) { err.textContent = '厨房かホールを選んでください'; return; }
+    var items = Object.keys(CL_SEL).filter(function (k) { return k.indexOf(CL_AREA + '|') === 0; }).map(function (k) { return CL_SEL[k]; });
+    if (!items.length) { err.textContent = '終わった場所を押して ✓ にしてください'; return; }
+    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '記録中…';
+    var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'clean', token: token, payload: { store: STORE, area: CL_AREA, items: items, name: document.getElementById('name').value } }) })
+      .then(function (res) { return res.json(); })
+      .then(function (r) {
+        if (!r || !r.ok) throw new Error((r && r.error) || '記録できませんでした');
+        document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
+        document.getElementById('result').classList.remove('hide');
+        document.querySelector('#result h1').textContent = '記録しました';
+        document.getElementById('preview').textContent = r.message;
+        var note = document.getElementById('doneNote'), ctx = null; try { ctx = liff.getContext(); } catch (e) {}
+        var type = ctx && ctx.type;
+        if (!type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。'; return; }
+        liff.sendMessages([{ type: 'text', text: '清掃を記録しました（#' + r.id + '）' }]).then(function () {
+          note.textContent = type === 'utou' ? 'お疲れさまでした。記録はあなたのトークにだけ届きます。' : 'お疲れさまでした。数秒でグループに記録が流れます。';
+        }).catch(function () { note.textContent = 'お疲れさまでした。記録は保存されています。'; });
+      })
+      .catch(function (e) { btn.disabled = false; btn.textContent = '清掃を記録する'; err.textContent = '記録に失敗しました: ' + e.message; });
+  }
+
   // ---------- 残業の報告 ----------
   function pad2(n) { return ('0' + n).slice(-2); }
   function tmin(t) { var m = String(t || '').match(/(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
@@ -423,7 +501,8 @@
     if (IS_OT) { sendOT(); return; }
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
-    if (!MODE) { err.textContent = '登録する内容（締め・製造・早番）を選んでください'; return; }
+    if (!MODE) { err.textContent = '登録する内容（締め・製造・早番・清掃）を選んでください'; return; }
+    if (MODE === '清掃') return sendClean();
     if (MODE !== '締め') return sendPart();
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
     if (!photoDaily) { err.textContent = '①日別売上の画面を入れてください'; return; }
