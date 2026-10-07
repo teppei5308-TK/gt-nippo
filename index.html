@@ -138,6 +138,7 @@
 <div class="wrap hide" id="otForm">
   <h1>残業の報告</h1>
   <p class="sub" id="otWho">送信者を確認しています…</p>
+  <div class="card hide" id="otWarn" style="border-color:#c9a24a;background:#fbf3e2"><p class="q" style="color:#8F6A1C">グループから開いてください</p><p class="hint" style="margin:0">このトークから送ると、報告はあなたにしか届きません。社員のみんなに見えるように、「【GRACE】正社員 残務実績報告」のグループのトークからリンクを開いて送ってください。</p></div>
   <div class="card">
     <div class="roww"><label>日付</label><input type="date" id="otDate"></div>
     <div class="roww"><label>退勤時間</label><input type="time" id="otLeave"></div>
@@ -342,6 +343,7 @@
     if (typeof liff === 'undefined') { who.textContent = 'LINE の外で開いています'; document.getElementById('nameBox').classList.remove('hide'); return; }
     liff.init({ liffId: LIFF_ID }).then(function () {
       if (!liff.isLoggedIn()) { liff.login(); return; }
+      try { var cx = liff.getContext(); if (IS_OT && cx && cx.type === 'utou') document.getElementById('otWarn').classList.remove('hide'); } catch (e) {}
       return liff.getProfile().then(function (p) { profile = { userId: p.userId, displayName: p.displayName }; who.textContent = '送信者：' + p.displayName; document.getElementById('otWho').textContent = '報告者：' + p.displayName; });
     }).catch(function () { who.textContent = 'LINE の情報を取得できませんでした（名前を入力してください）'; document.getElementById('nameBox').classList.remove('hide'); });
   })();
