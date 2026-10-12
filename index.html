@@ -171,8 +171,9 @@
 <script>
   var LIFF_ID = '2011853204-GVDc6N2x';
   var IS_OT = /mode(=|%3D)overtime/.test(location.search + location.hash);
-  // スタッフボードは別ページ（LIFF の liff.state 処理が済んで ?mode=board になってから移動）
-  if (/[?&]mode=board/.test(location.search) && !/liff\.state/.test(location.search)) location.replace('board.html' + location.search);
+  // スタッフボードは別ページ。LINE から開くと最初は ?liff.state=%3Fmode%3Dboard の形で届くので、どちらの形でもすぐ移動する
+  var TO_BOARD = /mode(=|%3D)board/i.test(location.search + location.hash);
+  if (TO_BOARD) location.replace('board.html?mode=board');
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };
@@ -341,6 +342,7 @@
 
   // LIFF
   (function initLiff() {
+    if (TO_BOARD) return;
     var who = document.getElementById('who');
     if (typeof liff === 'undefined') { who.textContent = 'LINE の外で開いています'; document.getElementById('nameBox').classList.remove('hide'); return; }
     liff.init({ liffId: LIFF_ID }).then(function () {
