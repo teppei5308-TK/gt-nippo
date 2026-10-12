@@ -171,6 +171,8 @@
 <script>
   var LIFF_ID = '2011853204-GVDc6N2x';
   var IS_OT = /mode(=|%3D)overtime/.test(location.search + location.hash);
+  // スタッフボードは別ページ（LIFF の liff.state 処理が済んで ?mode=board になってから移動）
+  if (/[?&]mode=board/.test(location.search) && !/liff\.state/.test(location.search)) location.replace('board.html' + location.search);
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };
