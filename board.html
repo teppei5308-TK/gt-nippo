@@ -257,7 +257,8 @@ function render() {
   var restW = rest.filter(function (s) { return !isHoli(s); }).length, restH = rest.length - restW;
   var ubDay = passed ? ubTotal / passed : 0;   // Uber は営業日1日あたりの平均で残りを足す
   var fc = total + restW * avgW + restH * avgH + ubDay * rest.length, fcPct = fc / DATA.monthTarget * 100, gapFc = DATA.monthTarget - fc;
-  var plans = (DATA.eventPlan || []).filter(function (p) { return p[1] > a; });
+  // 売上を記録済みの催事（天王寺MIO など）は「まだ入れていない予定」から外す
+  var plans = (DATA.eventPlan || []).filter(function (p) { return p[1] > a && !(DATA.events || []).some(function (e) { return e[0] >= p[0] && e[0] <= p[1] && e[1].indexOf(p[2]) === 0; }); });
   var scale = Math.max(DATA.monthTarget, fc) * 1.03, ok = gapFc <= 0;
   var remain = Math.max(0, DATA.monthTarget - total), pace = DATA.monthTarget * passed / open.length, ahead = total - pace;
   var mix = [evTotal ? '催事 ' + man(evTotal) : '', ubTotal ? 'Uber ' + man(ubTotal) : ''].filter(String).join('・');
