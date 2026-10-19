@@ -9,15 +9,15 @@
 <style>
 :root{
   --ground:#F3F2EC;--panel:#FFFFFF;--ink:#1E231F;--ink2:#4B524C;--muted:#737A73;--line:#E1E1D8;
-  --accent:#3E5F3B;--accent-soft:#E4ECDF;--gold:#B7841A;--gold-soft:#F6ECD3;--loss:#9EA39C;--loss-soft:#ECEDE8;--warn:#9B5B12;
+  --accent:#3E5F3B;--accent-soft:#E4ECDF;--gold:#B7841A;--gold-soft:#F6ECD3;--loss:#9EA39C;--loss-soft:#ECEDE8;--warn:#9B5B12;--slate:#4D6B8C;
   --jp:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;
   --ground:#151915;--panel:#1E231F;--ink:#EEF0EA;--ink2:#C3C9C1;--muted:#949B93;--line:#323831;
-  --accent:#8DB886;--accent-soft:#25331F;--gold:#E2B550;--gold-soft:#3A3018;--loss:#6E746C;--loss-soft:#272B26;--warn:#E3A35A}}
+  --accent:#8DB886;--accent-soft:#25331F;--gold:#E2B550;--gold-soft:#3A3018;--loss:#6E746C;--loss-soft:#272B26;--warn:#E3A35A;--slate:#8FB0D3}}
 :root[data-theme="dark"]{color-scheme:dark;
   --ground:#151915;--panel:#1E231F;--ink:#EEF0EA;--ink2:#C3C9C1;--muted:#949B93;--line:#323831;
-  --accent:#8DB886;--accent-soft:#25331F;--gold:#E2B550;--gold-soft:#3A3018;--loss:#6E746C;--loss-soft:#272B26;--warn:#E3A35A}
+  --accent:#8DB886;--accent-soft:#25331F;--gold:#E2B550;--gold-soft:#3A3018;--loss:#6E746C;--loss-soft:#272B26;--warn:#E3A35A;--slate:#8FB0D3}
 *{box-sizing:border-box}
 body{background:var(--ground);color:var(--ink);font-family:var(--jp);font-size:16px;line-height:1.7;-webkit-text-size-adjust:100%}
 .wrap{max-width:600px;margin:0 auto;padding-inline:16px;padding-block:18px 48px;display:flex;flex-direction:column;gap:14px}
@@ -30,6 +30,40 @@ h1{font-size:24px;font-weight:900;margin:0;line-height:1.35;text-wrap:balance}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
 h2{font-size:15px;margin:0 0 10px;font-weight:700;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 h2 small{font-size:12px;color:var(--muted);font-weight:400}
+.hm{display:flex;flex-direction:column;gap:8px;border-width:2px}
+.hm-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.hm-label{font-weight:700;font-size:15px}
+.hm-chip{font-size:13px;font-weight:700;border-radius:999px;padding:4px 12px}
+.hm-chip.ok{background:var(--accent-soft);color:var(--accent)}.hm-chip.ng{background:var(--gold-soft);color:var(--warn)}
+.hm-big{font-size:44px;font-weight:900;line-height:1.05}
+.hm-big span{font-size:18px;font-weight:700;margin-left:2px}
+.hm-big em{font-style:normal;font-size:20px;font-weight:700;color:var(--ink2);margin-left:10px}
+.hm-sub{font-size:13px;color:var(--ink2)}
+.hm-bar{position:relative;height:18px;border-radius:9px;background:var(--loss-soft);margin-top:6px}
+.hm-bar .act{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:9px 0 0 9px}
+.hm-bar .fc{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,var(--accent) 0 4px,transparent 4px 8px);opacity:.45}
+.hm-bar u{position:absolute;text-decoration:none}
+.hm-bar .tgt{top:-6px;bottom:-6px;width:3px;background:var(--ink);border-radius:2px}
+.hm-bar .now{top:-3px;bottom:-3px;width:0;border-left:2px dashed var(--gold)}
+.hm-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink2)}
+.hm-legend i{display:inline-block;width:14px;height:10px;margin-right:5px;vertical-align:-1px;border-radius:2px}
+.l-act{background:var(--accent)}.l-fc{background:repeating-linear-gradient(45deg,var(--accent) 0 3px,transparent 3px 6px);opacity:.6}
+.l-tgt{width:3px!important;background:var(--ink)}.l-now{width:0!important;border-left:2px dashed var(--gold);border-radius:0!important}
+.hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px}
+.hm-grid .k{background:var(--ground);border-radius:10px;padding:8px 10px}
+.hm-grid span{display:block;font-size:12px;color:var(--ink2)}
+.hm-grid b{display:block;font-size:20px;font-weight:900;line-height:1.3}
+.hm-grid small{font-size:11.5px;color:var(--muted)}
+.c1{stroke:var(--accent);background:var(--accent)}.c2{stroke:var(--gold);background:var(--gold)}.c3{stroke:var(--slate);background:var(--slate)}
+.split{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center}
+.donut{width:150px;height:150px}
+.donut .d-l{font-size:11px;fill:var(--ink2)}.donut .d-v{font-size:19px;font-weight:900;fill:var(--ink)}
+.legend2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.legend2 li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:center}
+.legend2 i{width:12px;height:12px;border-radius:3px;display:block}
+.legend2 .lg-n b{font-size:15px}.legend2 small{display:block;font-size:11.5px;color:var(--muted);line-height:1.4}
+.legend2 .lg-v{text-align:right}.legend2 .lg-v b{font-size:18px;font-weight:900}
+@media (max-width:420px){.split{grid-template-columns:1fr;justify-items:center}.legend2{width:100%}}
 /* 最新の営業日 */
 .hero{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
 .hero .label{font-size:13px;color:var(--ink2);grid-column:1/-1}
@@ -130,6 +164,9 @@ liff.init({ liffId: LIFF_ID }).then(function () {
 }).catch(function () { msg('LINE から開いてください。'); });
 /* ===== 表示 ===== */
 var WD = ['日', '月', '火', '水', '木', '金', '土'];
+// 非表示にする欄（また使うときはここから外す）：voices＝お客様の声、prod＝残りが多かった商品（製造表）
+var HIDE = ['voices', 'prod'];
+function shown(k) { return HIDE.indexOf(k) < 0 && (!DATA.hide || DATA.hide.indexOf(k) < 0); }
 function d8(s) { return new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8)); }
 function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 function man(n) { return (Math.round(n / 1000) / 10).toFixed(1) + '万'; }
@@ -164,7 +201,7 @@ function render() {
 
   h += '<header><div class="brand">TERRAS BAKERY / COFFEE</div><h1>' + DATA.store + ' スタッフボード</h1>' +
     '<div class="asof">' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）までの Airレジ実績・売上は税込</div>' +
-    '<div class="asof">更新 ' + DATA.updated + '</div></header>';
+    '<div class="asof">更新 ' + DATA.updated + '</div></header>%%MONTH%%';
 
   // 最新の営業日
   var maxV = Math.max(L[2] * 1.05, y[0]);
@@ -186,13 +223,43 @@ function render() {
       (gap > 0 ? '白星には、平均より <b class="num">' + man(gap) + '</b> 上乗せが必要です。' : '平均どおりでも白星に届きます。金星を狙いましょう。') + '</p>' : '') + todayBox(next, NL) + '</section>';
   }
 
-  // 今月の進み具合
+  // 今月の進み具合と着地見込み（ページの一番上に出す）
   var pct = total / DATA.monthTarget * 100, passed = open.filter(function (s) { return s <= a; }).length;
-  h += '<section class="card month"><h2>' + (m0 + 1) + '月の進み具合<small>目標 ' + manL(DATA.monthTarget) + '円（前年10月の110%）</small></h2>' +
-    '<div class="mrow"><div class="v num">' + man(total) + '<small>円' + (evTotal ? '（うち催事 ' + man(evTotal) + '）' : '') + '</small></div><div class="num" style="font-weight:700">' + pct.toFixed(1) + '%</div></div>' +
-    '<div class="bar"><i style="width:' + Math.min(100, pct) + '%"></i><u style="left:' + (passed / open.length * 100) + '%"></u></div>' +
-    '<div class="stats"><div><span>白星</span><b class="num">' + wins + '勝' + losses + '敗</b></div><div><span>残り営業日</span><b class="num">' + rest.length + '日</b></div><div><span>1日あたり必要</span><b class="num">' + man(per) + '</b></div></div>' +
-    '<p class="hint" style="margin:0">バーの黒い線は、営業日数で見た「今日の位置」です。線より左なら遅れています。</p></section>';
+  var wk = [], ho = [];
+  Object.keys(DATA.days).forEach(function (s) { if (s.slice(0, 7) !== ym || s > a) return; (isHoli(s) ? ho : wk).push(DATA.days[s][0]); });
+  var mean = function (x) { return x.reduce(function (p, q) { return p + q; }, 0) / x.length; };
+  var avgW = wk.length >= 2 ? mean(wk) : DATA.lines.weekday[0], avgH = ho.length >= 2 ? mean(ho) : DATA.lines.holiday[0];
+  var restW = rest.filter(function (s) { return !isHoli(s); }).length, restH = rest.length - restW;
+  var fc = total + restW * avgW + restH * avgH, fcPct = fc / DATA.monthTarget * 100, gapFc = DATA.monthTarget - fc;
+  var plans = (DATA.eventPlan || []).filter(function (p) { return p[1] > a; });
+  var scale = Math.max(DATA.monthTarget, fc) * 1.03, ok = gapFc <= 0;
+  var monthHtml = '<section class="card hm"><div class="hm-top"><span class="hm-label">' + (m0 + 1) + '月の売上</span><span class="hm-chip ' + (ok ? 'ok' : 'ng') + '">' + (ok ? 'このペースで目標達成' : '目標まで あと ' + man(gapFc) + ' の見込み') + '</span></div>' +
+    '<div class="hm-big num">' + (total / 10000).toFixed(1) + '<span>万円</span><em>' + pct.toFixed(1) + '%</em></div>' +
+    '<div class="hm-sub">目標 ' + manL(DATA.monthTarget) + '円（前年10月の110%）' + (evTotal ? '・うち催事 ' + man(evTotal) : '') + '</div>' +
+    '<div class="hm-bar"><i class="act" style="width:' + (total / scale * 100) + '%"></i><i class="fc" style="left:' + (total / scale * 100) + '%;width:' + (Math.max(0, fc - total) / scale * 100) + '%"></i>' +
+    '<u class="tgt" style="left:' + (DATA.monthTarget / scale * 100) + '%"></u><u class="now" style="left:' + (passed / open.length * DATA.monthTarget / scale * 100) + '%"></u></div>' +
+    '<div class="hm-legend"><span><i class="l-act"></i>実績</span><span><i class="l-fc"></i>着地見込み</span><span><i class="l-tgt"></i>目標</span><span><i class="l-now"></i>今日の位置</span></div>' +
+    '<div class="hm-grid">' +
+      '<div class="k"><span>着地見込み</span><b class="num">' + man(fc) + '</b><small class="num">目標の ' + fcPct.toFixed(0) + '%</small></div>' +
+      '<div class="k"><span>残り ' + rest.length + '営業日</span><b class="num">' + man(per) + '</b><small>1日あたりで達成</small></div>' +
+      '<div class="k"><span>白星</span><b class="num">' + wins + '勝' + losses + '敗</b><small class="num">勝率 ' + Math.round(wins / Math.max(1, wins + losses) * 100) + '%</small></div>' +
+    '</div>' +
+    '<p class="hint" style="margin:10px 0 0">見込み＝今月の平均（平日 ' + man(avgW) + '・土日祝 ' + man(avgH) + '）× 残りの営業日（平日 ' + restW + '日・土日祝 ' + restH + '日）。' +
+    (plans.length ? '催事の予定（' + plans.map(function (p) { return p[2]; }).join('・') + '）は入れていないので、その分が上乗せになります。' : '') + '</p></section>';
+
+  // 売上の内訳（本店・2ND・催事）
+  var hon = 0, honD = 0, honC = 0, ndS = 0, ndD = 0, ndC = 0, evS = 0, evD = 0, evC = 0;
+  Object.keys(DATA.days).forEach(function (s) { if (s.slice(0, 7) !== ym || s > a) return; hon += DATA.days[s][0]; honD++; honC += DATA.days[s][1] || 0; });
+  Object.keys(DATA.nd || {}).forEach(function (s) { if (s.slice(0, 7) !== ym || s > a) return; ndS += DATA.nd[s][0]; ndD++; ndC += DATA.nd[s][1] || 0; });
+  (DATA.events || []).forEach(function (e) { if (e[0].slice(0, 7) !== ym || e[0] > a) return; evS += e[2]; evD++; evC += e[3] || 0; });
+  var parts = [['本店', hon, honD, honC, 'c1'], ['2ND', ndS, ndD, ndC, 'c2'], ['催事', evS, evD, evC, 'c3']].filter(function (x) { return x[1] > 0; });
+  var all = parts.reduce(function (p, x) { return p + x[1]; }, 0), R = 54, C = 2 * Math.PI * R, off = 0, gap = parts.length > 1 ? 3 : 0;
+  var arcs = parts.map(function (x) { var len = x[1] / all * C, seg = '<circle cx="70" cy="70" r="' + R + '" fill="none" class="' + x[4] + '" stroke-width="22" stroke-dasharray="' + Math.max(0, len - gap).toFixed(2) + ' ' + (C - Math.max(0, len - gap)).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"/>'; off += len; return seg; }).join('');
+  var splitHtml = '<section class="card"><h2>' + (m0 + 1) + '月の売上の内訳<small>本店・2ND・催事（税込）</small></h2><div class="split">' +
+    '<svg viewBox="0 0 140 140" class="donut" role="img" aria-label="売上の内訳"><circle cx="70" cy="70" r="' + R + '" fill="none" stroke="var(--loss-soft)" stroke-width="22"/>' + arcs +
+    '<text x="70" y="66" text-anchor="middle" class="d-l">合計</text><text x="70" y="86" text-anchor="middle" class="d-v">' + (all / 10000).toFixed(1) + '万</text></svg><ul class="legend2">' +
+    parts.map(function (x) { return '<li><i class="' + x[4] + '"></i><div class="lg-n"><b>' + x[0] + '</b><small>' + x[2] + '日・1日 ' + man(x[1] / x[2]) + (x[3] ? '・客単価 ' + yen(x[1] / x[3]) : '') + '</small></div><div class="lg-v num"><b>' + man(x[1]) + '</b><small>' + Math.round(x[1] / all * 100) + '%</small></div></li>'; }).join('') +
+    '</ul></div><p class="hint" style="margin:10px 0 0">月の目標（' + manL(DATA.monthTarget) + '）は本店＋催事で数えています。2ND は内訳にだけ出しています。</p></section>';
 
   // 催事（本店の月目標とは別）
   var EV = (DATA.events || []), PL = (DATA.eventPlan || []).filter(function (p) { return !EV.some(function (e) { return e[0] >= p[0] && e[0] <= p[1] && e[1].indexOf(p[2]) === 0; }) && p[1] > a; });
@@ -227,12 +294,12 @@ function render() {
 
   // 残り
   var P = DATA.prod;
-  if (P) h += '<section class="card"><h2>残りが多かった商品<small>' + P.date.slice(5).replace('-', '/') + ' 製造表より</small></h2>' +
+  if (P && shown('prod')) h += '<section class=\"card\"><h2>残りが多かった商品<small>' + P.date.slice(5).replace('-', '/') + ' 製造表より</small></h2>' +
     '<p class="hint" style="margin:0 0 10px">作った <b class="num">' + P.made + '個</b>・残り <b class="num">' + P.left + '個</b>（<b class="num">' + Math.round(P.left / P.made * 100) + '%</b>）。9月の平均は26%でした。</p><ul class="list">' +
     P.top.map(function (p) { return '<li><span class="nm">' + p[0] + '</span><span class="v num">残り ' + p[1] + ' / ' + p[2] + '個</span></li>'; }).join('') + '</ul></section>';
 
   // お客様の声
-  if (DATA.voices.pos.length + DATA.voices.neg.length) h += '<section class="card"><h2>お客様の声<small>日報より</small></h2><div class="voices">' +
+  if (shown('voices') && DATA.voices && DATA.voices.pos.length + DATA.voices.neg.length) h += '<section class="card"><h2>お客様の声<small>日報より</small></h2><div class="voices">' +
     DATA.voices.pos.map(function (v) { return '<div class="voice pos">「' + v[0] + '」<small>' + v[1] + '</small></div>'; }).join('') +
     DATA.voices.neg.map(function (v) { return '<div class="voice neg">「' + v[0] + '」<small>' + v[1] + '</small></div>'; }).join('') + '</div></section>';
 
@@ -241,6 +308,7 @@ function render() {
     DATA.focus.map(function (f) { return '<li><div><b>' + f[0] + '</b><span>' + f[1] + '</span></div></li>'; }).join('') + '</ol></section>';
 
   h += '<footer>売上は税込（Airレジの日別売上・締めの日報）。白星ラインと月の目標はオーナー決定。製造数・残り・お客様の声は日報から。</footer>';
+  h = h.replace('%%MONTH%%', monthHtml + splitHtml);
   document.getElementById('app').innerHTML = h;
 }
 </script>

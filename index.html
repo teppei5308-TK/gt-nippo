@@ -37,6 +37,7 @@
   .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
   button.send{width:100%;max-width:532px;display:block;margin:0 auto;background:var(--acc2);color:#fff;border:0;border-radius:10px;padding:14px;font-size:17px;font-weight:700}
   button.send:disabled{opacity:.5}
+  .boardLink{display:block;margin:-4px 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--acc2);font-size:14px;font-weight:700;text-decoration:none}
   .done{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px}
   .err{color:#9E3F33;font-size:13px;margin-top:6px}
   .hide{display:none}
@@ -60,6 +61,7 @@
 <div class="wrap" id="form">
   <h1>営業日報</h1>
   <p class="sub" id="who">送信者を確認しています…</p>
+  <a class="boardLink" href="board.html">スタッフボードを見る　→</a>
 
   <div class="card">
     <p class="q">店舗</p>
@@ -138,7 +140,7 @@
 <div class="wrap hide" id="otForm">
   <h1>残業の報告</h1>
   <p class="sub" id="otWho">送信者を確認しています…</p>
-  <div class="card hide" id="otWarn" style="border-color:#c9a24a;background:#fbf3e2"><p class="q" style="color:#8F6A1C">グループから開いてください</p><p class="hint" style="margin:0">このトークから送ると、報告はあなたにしか届きません。社員のみんなに見えるように、「【GRACE】正社員 残務実績報告」のグループのトークからリンクを開いて送ってください。</p></div>
+  <div class="card hide" id="otWarn" style="border-color:#c9a24a;background:#fbf3e2"><p class="q" style="color:#8F6A1C">送ったあとにグループを選んでください</p><p class="hint" style="margin:0">このトークから開いています。送信したあと「グループに流す」を押して、「【GRACE】正社員 残務実績報告」を選ぶと、社員のみんなに見えます。</p></div>
   <div class="card">
     <div class="roww"><label>日付</label><input type="date" id="otDate"></div>
     <div class="roww"><label>退勤時間</label><input type="time" id="otLeave"></div>
@@ -162,6 +164,7 @@
 <div class="wrap hide" id="result">
   <h1>送信しました</h1>
   <p class="sub" id="doneNote">お疲れさまでした。</p>
+  <button class="send hide" id="shareBtn" style="margin:0 0 14px">グループに流す</button>
   <div class="done" id="preview"></div>
 </div>
 
@@ -352,15 +355,31 @@
     }).catch(function () { who.textContent = 'LINE の情報を取得できませんでした（名前を入力してください）'; document.getElementById('nameBox').classList.remove('hide'); });
   })();
 
-  // 送信後、開いたトークに「#ID」を投稿 → ボットがその投稿に返信して日報を流す（返信は無料）
-  function postToChat(store, id) {
+  // 送信後にトークへ流す
+  // ・グループから開いたとき：「#ID」を投稿 → ボットがその投稿に返信して流す（返信は無料）
+  // ・1対1トーク（GRACE TERRA のメニューなど）から開いたとき：ボタンで送り先のグループを選んで、本文をそのまま流す
+  function relay(idText, full, okNote, kind) {
     var note = document.getElementById('doneNote');
     var ctx = null; try { ctx = (typeof liff !== 'undefined' && liff.getContext) ? liff.getContext() : null; } catch (e) {}
     var type = ctx && ctx.type;
-    if (!id || !type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。LINE のトークから開くと、日報がトークに流れます。'; return; }
-    liff.sendMessages([{ type: 'text', text: '日報を送信しました：' + store + '（#' + id + '）' }]).then(function () {
-      note.textContent = type === 'utou' ? 'お疲れさまでした。この日報はあなたのトークにだけ届きます。グループ全員に流すときは、グループのトークから開いて送信してください。' : 'お疲れさまでした。数秒でグループに日報が流れます。この画面は閉じてかまいません。';
-    }).catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。日報は保存されています。'; });
+    if (type === 'group' || type === 'room') {
+      liff.sendMessages([{ type: 'text', text: idText }]).then(function () { note.textContent = okNote; })
+        .catch(function (e) { note.textContent = 'お疲れさまでした。トークへの投稿に失敗しました（' + e.message + '）。' + kind + 'は保存されています。'; });
+      return;
+    }
+    var can = false; try { can = !!(full && liff.isApiAvailable('shareTargetPicker')); } catch (e) {}
+    if (!can) { note.textContent = 'お疲れさまでした。' + kind + 'は保存されています。グループに流すときは、グループのトークから開いて送信してください。'; return; }
+    note.textContent = 'お疲れさまでした。' + kind + 'は保存されています。下のボタンで送り先のグループを選ぶと、みんなに流せます。';
+    var b = document.getElementById('shareBtn'); b.classList.remove('hide');
+    b.onclick = function () {
+      liff.shareTargetPicker([{ type: 'text', text: String(full).slice(0, 5000) }], { isMultiple: false }).then(function (res) {
+        if (res) { b.classList.add('hide'); note.textContent = 'グループに流しました。お疲れさまでした。'; }
+      }).catch(function (e) { note.textContent = '流せませんでした（' + e.message + '）。' + kind + 'は保存されています。'; });
+    };
+  }
+  function postToChat(store, id, full) {
+    if (!id) { document.getElementById('doneNote').textContent = 'お疲れさまでした。'; return; }
+    relay('日報を送信しました：' + store + '（#' + id + '）', full, 'お疲れさまでした。数秒でグループに日報が流れます。この画面は閉じてかまいません。', '日報');
   }
 
   // ---------- 清掃チェック ----------
@@ -407,12 +426,7 @@
         document.getElementById('result').classList.remove('hide');
         document.querySelector('#result h1').textContent = '記録しました';
         document.getElementById('preview').textContent = r.message;
-        var note = document.getElementById('doneNote'), ctx = null; try { ctx = liff.getContext(); } catch (e) {}
-        var type = ctx && ctx.type;
-        if (!type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。'; return; }
-        liff.sendMessages([{ type: 'text', text: '清掃を記録しました（#' + r.id + '）' }]).then(function () {
-          note.textContent = type === 'utou' ? 'お疲れさまでした。記録はあなたのトークにだけ届きます。' : 'お疲れさまでした。数秒でグループに記録が流れます。';
-        }).catch(function () { note.textContent = 'お疲れさまでした。記録は保存されています。'; });
+        relay('清掃を記録しました（#' + r.id + '）', r.message, 'お疲れさまでした。数秒でグループに記録が流れます。', '記録');
       })
       .catch(function (e) { btn.disabled = false; btn.textContent = '清掃を記録する'; err.textContent = '記録に失敗しました: ' + e.message; });
   }
@@ -456,12 +470,7 @@
         document.getElementById('result').classList.remove('hide');
         document.querySelector('#result h1').textContent = '報告しました';
         document.getElementById('preview').textContent = r.message;
-        var note = document.getElementById('doneNote'), ctx = null; try { ctx = liff.getContext(); } catch (e) {}
-        var type = ctx && ctx.type;
-        if (!type || type === 'external' || type === 'none') { note.textContent = 'お疲れさまでした。LINE のトークから開くと、報告がトークに流れます。'; return; }
-        liff.sendMessages([{ type: 'text', text: '残業報告を送信しました（#' + r.id + '）' }]).then(function () {
-          note.textContent = type === 'utou' ? 'お疲れさまでした。この報告はあなたのトークにだけ届きます。グループに流すときは、グループのトークから開いて送信してください。' : 'お疲れさまでした。数秒でグループに報告が流れます。';
-        }).catch(function () { note.textContent = 'お疲れさまでした。報告は保存されています。'; });
+        relay('残業報告を送信しました（#' + r.id + '）', r.message, 'お疲れさまでした。数秒でグループに報告が流れます。', '報告');
       })
       .catch(function (e) { btn.disabled = false; btn.textContent = '残業を報告する'; err.textContent = '送信に失敗しました: ' + e.message; });
   }
@@ -539,7 +548,7 @@
         document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
         document.getElementById('result').classList.remove('hide');
         document.getElementById('preview').textContent = r.message;
-        postToChat(STORE, r.id);
+        postToChat(STORE, r.id, r.message);
       })
       .catch(function (e) { btn.disabled = false; btn.textContent = '送信する'; err.textContent = '送信に失敗しました: ' + e.message; });
   });
