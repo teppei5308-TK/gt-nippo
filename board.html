@@ -39,7 +39,18 @@ h2 small{font-size:12px;color:var(--muted);font-weight:400}
 .hm-big span{font-size:18px;font-weight:700;margin-left:2px}
 .hm-big em{font-style:normal;font-size:20px;font-weight:700;color:var(--ink2);margin-left:10px}
 .hm-sub{font-size:13px;color:var(--ink2)}
-.hm-bar{position:relative;height:18px;border-radius:9px;background:var(--loss-soft);margin-top:6px}
+.hm-goal{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hm-goal .g{border-radius:12px;padding:10px 12px;background:var(--ground);display:flex;flex-direction:column;gap:2px;min-width:0}
+.hm-goal .g span{font-size:12.5px;font-weight:700;color:var(--ink2)}
+.hm-goal .g b{font-size:30px;font-weight:900;line-height:1.1;white-space:nowrap}
+.hm-goal .g b small{font-size:13px;font-weight:700;margin-left:1px}
+.hm-goal .g em{font-style:normal;font-size:11.5px;color:var(--muted);line-height:1.35}
+.hm-goal .g-t{background:var(--ink);color:var(--panel)}
+.hm-goal .g-t span,.hm-goal .g-t em{color:var(--panel);opacity:.8}
+@media (max-width:380px){.hm-goal{gap:6px}.hm-goal .g{padding:9px 8px}.hm-goal .g b{font-size:25px}}
+.hm-barwrap{position:relative;padding-top:22px;margin-top:2px}
+.hm-barwrap .tgt-l{position:absolute;top:0;transform:translateX(-100%);padding-right:6px;font-size:12px;font-weight:700;white-space:nowrap}
+.hm-bar{position:relative;height:18px;border-radius:9px;background:var(--loss-soft)}
 .hm-bar .act{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:9px 0 0 9px}
 .hm-bar .fc{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,var(--accent) 0 4px,transparent 4px 8px);opacity:.45}
 .hm-bar u{position:absolute;text-decoration:none}
@@ -235,18 +246,26 @@ function render() {
   var fc = total + restW * avgW + restH * avgH + ubDay * rest.length, fcPct = fc / DATA.monthTarget * 100, gapFc = DATA.monthTarget - fc;
   var plans = (DATA.eventPlan || []).filter(function (p) { return p[1] > a; });
   var scale = Math.max(DATA.monthTarget, fc) * 1.03, ok = gapFc <= 0;
-  var monthHtml = '<section class="card hm"><div class="hm-top"><span class="hm-label">' + (m0 + 1) + '月の売上</span><span class="hm-chip ' + (ok ? 'ok' : 'ng') + '">' + (ok ? 'このペースで目標達成' : '目標まで あと ' + man(gapFc) + ' の見込み') + '</span></div>' +
-    '<div class="hm-big num">' + (total / 10000).toFixed(1) + '<span>万円</span><em>' + pct.toFixed(1) + '%</em></div>' +
-    '<div class="hm-sub">目標 ' + manL(DATA.monthTarget) + '円（前年10月の110%）' + ([evTotal ? '催事 ' + man(evTotal) : '', ubTotal ? 'Uber ' + man(ubTotal) : ''].filter(String).join('・').replace(/^(.)/, '・うち$1')) + '</div>' +
+  var remain = Math.max(0, DATA.monthTarget - total), pace = DATA.monthTarget * passed / open.length, ahead = total - pace;
+  var mix = [evTotal ? '催事 ' + man(evTotal) : '', ubTotal ? 'Uber ' + man(ubTotal) : ''].filter(String).join('・');
+  var mn = function (v) { var x = v / 10000; return (Math.abs(x - Math.round(x)) < 0.05 ? Math.round(x) : x.toFixed(1)) + '<small>万</small>'; };
+  var tl = DATA.monthTarget / scale * 100;
+  var monthHtml = '<section class="card hm"><div class="hm-top"><span class="hm-label">' + (m0 + 1) + '月の目標</span><span class="hm-chip ' + (ok ? 'ok' : 'ng') + '">' + (ok ? 'このペースで目標達成' : '目標まで あと ' + man(gapFc) + ' の見込み') + '</span></div>' +
+    '<div class="hm-goal">' +
+      '<div class="g g-t"><span>目標</span><b class="num">' + mn(DATA.monthTarget) + '</b><em>前年比 110%</em></div>' +
+      '<div class="g"><span>いま</span><b class="num">' + mn(total) + '</b><em class="num">達成率 ' + pct.toFixed(1) + '%</em></div>' +
+      '<div class="g"><span>あと</span><b class="num">' + mn(remain) + '</b><em class="num">' + (rest.length ? '1日 ' + man(per) : '') + '</em></div>' +
+    '</div>' +
+    '<div class="hm-barwrap"><span class="tgt-l num" style="left:' + tl + '%">目標 ' + manL(DATA.monthTarget) + '</span>' +
     '<div class="hm-bar"><i class="act" style="width:' + (total / scale * 100) + '%"></i><i class="fc" style="left:' + (total / scale * 100) + '%;width:' + (Math.max(0, fc - total) / scale * 100) + '%"></i>' +
-    '<u class="tgt" style="left:' + (DATA.monthTarget / scale * 100) + '%"></u><u class="now" style="left:' + (passed / open.length * DATA.monthTarget / scale * 100) + '%"></u></div>' +
-    '<div class="hm-legend"><span><i class="l-act"></i>実績</span><span><i class="l-fc"></i>着地見込み</span><span><i class="l-tgt"></i>目標</span><span><i class="l-now"></i>今日の位置</span></div>' +
+    '<u class="tgt" style="left:' + tl + '%"></u><u class="now" style="left:' + (pace / scale * 100) + '%"></u></div></div>' +
+    '<div class="hm-legend"><span><i class="l-act"></i>実績</span><span><i class="l-fc"></i>着地見込み</span><span><i class="l-tgt"></i>目標</span><span><i class="l-now"></i>日割りペース</span></div>' +
     '<div class="hm-grid">' +
       '<div class="k"><span>着地見込み</span><b class="num">' + man(fc) + '</b><small class="num">目標の ' + fcPct.toFixed(0) + '%</small></div>' +
-      '<div class="k"><span>残り ' + rest.length + '営業日</span><b class="num">' + man(per) + '</b><small>1日あたりで達成</small></div>' +
+      '<div class="k"><span>日割り比</span><b class="num">' + (ahead >= 0 ? '+' : '−') + man(Math.abs(ahead)) + '</b><small>' + (ahead >= 0 ? '先行' : '遅れ') + '</small></div>' +
       '<div class="k"><span>白星</span><b class="num">' + wins + '勝' + losses + '敗</b><small class="num">勝率 ' + Math.round(wins / Math.max(1, wins + losses) * 100) + '%</small></div>' +
     '</div>' +
-    '<p class="hint" style="margin:10px 0 0">見込み＝今月の平均（平日 ' + man(avgW) + '・土日祝 ' + man(avgH) + '）× 残りの営業日（平日 ' + restW + '日・土日祝 ' + restH + '日）' + (ubDay ? '＋Uber（1日 ' + man(ubDay) + '）' : '') + '。' +
+    '<p class="hint" style="margin:10px 0 0">目標は本店＋催事＋Uber の合計（税込）' + (mix ? '。いまの ' + mn(total).replace(/<[^>]+>/g, '') + 'のうち ' + mix : '') + '。2ND は含みません。<br>見込み＝今月の平均（平日 ' + man(avgW) + '・土日祝 ' + man(avgH) + '）× 残りの営業日（平日 ' + restW + '日・土日祝 ' + restH + '日）' + (ubDay ? '＋Uber（1日 ' + man(ubDay) + '）' : '') + '。' +
     (plans.length ? '催事の予定（' + plans.map(function (p) { return p[2]; }).join('・') + '）は入れていないので、その分が上乗せになります。' : '') + '</p></section>';
 
   // 売上の内訳（本店・2ND・催事）
