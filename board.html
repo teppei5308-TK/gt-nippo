@@ -349,6 +349,16 @@ function render() {
     DATA.best.map(function (p, k) { return '<li><span class="rk num">' + (k + 1) + '</span><span class="nm">' + p[0] + '<small>1日あたり 約' + (p[2] || Math.round(p[1] / bd)) + '個</small></span><span class="v num">' + p[1].toLocaleString('ja-JP') + '個</span></li>'; }).join('') +
     '</ol><p class="hint">午後の焼き足しは、この5品を最優先に。売り切れはお客様の「また来ます」につながります。</p></section>';
 
+  // フェア商品（期間中だけ。売れた順。まだ取り込みがない商品は「—」）
+  var F = DATA.fair;
+  if (F && F.items && F.items.length) {
+    var fi = F.items.slice().sort(function (a, b) { return (b[2] == null ? -1 : b[2]) - (a[2] == null ? -1 : a[2]); });
+    var fsold = fi.filter(function (p) { return p[2] != null; }).length;
+    h += '<section class="card"><h2>' + F.name + '<small>' + Number(F.to.slice(5, 7)) + '/' + Number(F.to.slice(8)) + 'まで・' + (F.period ? 'Airレジ 売れた個数（' + F.period + '）' : '数字はまだありません') + '</small></h2><ol class="list">' +
+      fi.map(function (p, k) { return '<li><span class="rk num">' + (p[2] != null ? k + 1 : '・') + '</span><span class="nm">' + p[0] + '<small>¥' + p[1] + '（税抜）' + (p[2] && F.days ? '・1日あたり 約' + Math.max(1, Math.round(p[2] / F.days)) + '個' : '') + '</small></span><span class="v num">' + (p[2] != null ? p[2].toLocaleString('ja-JP') + '個' : '—') + '</span></li>'; }).join('') +
+      '</ol><p class="hint">' + (fsold ? '上の商品は午後も切らさない。動きの遅い商品は入口側に出して、お会計で一言おすすめを。' : '次に Airレジの「バリエーション別売上」を取り込むと、売れた個数が入ります。') + '</p></section>';
+  }
+
   // 残り
   var P = DATA.prod;
   if (P && shown('prod')) h += '<section class=\"card\"><h2>残りが多かった商品<small>' + P.date.slice(5).replace('-', '/') + ' 製造表より</small></h2>' +
