@@ -98,9 +98,11 @@
       <label class="ph" id="phDaily"><b>① 日別売上（上の部分）</b><span>売上合計・内消費税等・客数</span><input type="file" accept="image/*" id="inDaily"></label>
       <label class="ph" id="phCat"><b>② 販売商品（閉じたまま）</b><span>カテゴリごとの点数・金額</span><input type="file" accept="image/*" id="inCat"></label>
     </div>
-    <p class="lab">③ 販売商品（「すべての項目を開く」を押した画面）<small>スクロールして何枚でも</small></p>
+    <div class="hide" id="itemsBox"><!-- ③ 商品ごとの画面は使わない（2026/10/20。商品の分析はボード・Airレジのデータで） -->
+    <p class="lab">③ 販売商品（「すべての項目を開く」を押した画面）</p>
     <label class="ph" style="min-height:56px"><b>＋ 商品ごとの画面を追加</b><input type="file" accept="image/*" id="inItems"></label>
     <div class="thumbs" id="itemThumbs"></div>
+    </div>
     <p class="hint">iPad のスクリーンショット（ホームボタン＋電源ボタン）を選ぶと、文字がはっきりして読み取りが正確です。写真で撮るときは画面に正面から。</p>
   </div>
 
@@ -248,8 +250,8 @@
     var ars = cfg.filter(function (c) { return c.type === '売掛'; });
     var rv = MAKE ? null : cfg.filter(function (c) { return c.type === '口コミ'; })[0];
     var texts = MAKE ? [] : cfg.filter(function (c) { return c.type === '記述' && (CLOSE || !/予約/.test(c.section)); });
-    if (MAKE || (!CLOSE && !EARLY)) { ars = []; }
-    var auto = cfg.filter(function (c) { return (c.type === '指標' || c.type === '商品' || c.type === '部門') && c.name !== '合計'; }).map(function (c) { return c.name; });
+    ars = [];   // 売掛は Airレジ①の画面から読む（2026/10/20。入力欄は出さない）
+    var auto = cfg.filter(function (c) { return (c.type === '指標' || c.type === '部門') && c.name !== '合計'; }).map(function (c) { return c.name; }).concat(['売掛（あれば）']);
     var cms = cfg.filter(function (c) { return c.type === 'コメント'; });
     document.getElementById('defaultComments').style.display = cms.length ? 'none' : '';
     var cc = document.getElementById('customComments'); cc.innerHTML = '';
