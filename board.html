@@ -286,20 +286,19 @@ function render() {
     '<p class="hint" style="margin:10px 0 0">目標は本店＋催事＋Uber の合計（税込）' + (mix ? '。いまの ' + mn(total).replace(/<[^>]+>/g, '') + 'のうち ' + mix : '') + '。2ND は含みません。<br>見込み＝今月の平均（平日 ' + man(avgW) + '・土日祝 ' + man(avgH) + '）× 残りの営業日（平日 ' + restW + '日・土日祝 ' + restH + '日）' + (ubDay ? '＋Uber（1日 ' + man(ubDay) + '）' : '') + '。' +
     (plans.length ? '催事の予定（' + plans.map(function (p) { return p[2]; }).join('・') + '）は入れていないので、その分が上乗せになります。' : '') + '</p></section>';
 
-  // 売上の内訳（本店・2ND・催事）
+  // 売上の内訳（本店・催事・Uber。2ND は出さない 2026/10/20）
   var hon = 0, honD = 0, honC = 0, ndS = 0, ndD = 0, ndC = 0, evS = 0, evD = 0, evC = 0, ubS = 0, ubD = 0, ubC = 0;
   Object.keys(DATA.uber || {}).forEach(function (s) { if (s.slice(0, 7) !== ym || s > a) return; ubS += DATA.uber[s][0]; ubD++; ubC += DATA.uber[s][1] || 0; });
   Object.keys(DATA.days).forEach(function (s) { if (s.slice(0, 7) !== ym || s > a) return; hon += DATA.days[s][0]; honD++; honC += DATA.days[s][1] || 0; });
-  Object.keys(DATA.nd || {}).forEach(function (s) { if (s.slice(0, 7) !== ym || s > a) return; ndS += DATA.nd[s][0]; ndD++; ndC += DATA.nd[s][1] || 0; });
   (DATA.events || []).forEach(function (e) { if (e[0].slice(0, 7) !== ym) return; evS += e[2]; evD++; evC += e[3] || 0; });
-  var parts = [['本店', hon, honD, honC, 'c1'], ['2ND', ndS, ndD, ndC, 'c2'], ['催事', evS, evD, evC, 'c3'], ['Uber', ubS, ubD, ubC, 'c4', '注文単価']].filter(function (x) { return x[1] > 0; });
+  var parts = [['本店', hon, honD, honC, 'c1'], ['催事', evS, evD, evC, 'c3'], ['Uber', ubS, ubD, ubC, 'c4', '注文単価']].filter(function (x) { return x[1] > 0; });
   var all = parts.reduce(function (p, x) { return p + x[1]; }, 0), R = 54, C = 2 * Math.PI * R, off = 0, gap = parts.length > 1 ? 3 : 0;
   var arcs = parts.map(function (x) { var len = x[1] / all * C, seg = '<circle cx="70" cy="70" r="' + R + '" fill="none" class="' + x[4] + '" stroke-width="22" stroke-dasharray="' + Math.max(0, len - gap).toFixed(2) + ' ' + (C - Math.max(0, len - gap)).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"/>'; off += len; return seg; }).join('');
-  var splitHtml = '<section class="card"><h2>' + (m0 + 1) + '月の売上の内訳<small>本店・2ND・催事・Uber（税込）</small></h2><div class="split">' +
+  var splitHtml = '<section class="card"><h2>' + (m0 + 1) + '月の売上の内訳<small>本店・催事・Uber（税込）</small></h2><div class="split">' +
     '<svg viewBox="0 0 140 140" class="donut" role="img" aria-label="売上の内訳"><circle cx="70" cy="70" r="' + R + '" fill="none" stroke="var(--loss-soft)" stroke-width="22"/>' + arcs +
     '<text x="70" y="66" text-anchor="middle" class="d-l">合計</text><text x="70" y="86" text-anchor="middle" class="d-v">' + (all / 10000).toFixed(1) + '万</text></svg><ul class="legend2">' +
     parts.map(function (x) { return '<li><i class="' + x[4] + '"></i><div class="lg-n"><b>' + x[0] + '</b><small>' + x[2] + '日・1日 ' + man(x[1] / x[2]) + (x[3] ? '・' + (x[5] || '客単価') + ' ' + yen(x[1] / x[3]) : '') + '</small></div><div class="lg-v num"><b>' + man(x[1]) + '</b><small>' + Math.round(x[1] / all * 100) + '%</small></div></li>'; }).join('') +
-    '</ul></div><p class="hint" style="margin:10px 0 0">月の目標（' + manL(DATA.monthTarget) + '）は本店＋催事＋Uber で数えています。2ND は内訳にだけ出しています。</p></section>';
+    '</ul></div><p class="hint" style="margin:10px 0 0">月の目標（' + manL(DATA.monthTarget) + '）は本店＋催事＋Uber で数えています。</p></section>';
 
   // 催事（本店の月目標とは別）
   var EV = (DATA.events || []), PL = (DATA.eventPlan || []).filter(function (p) { return !EV.some(function (e) { return e[0] >= p[0] && e[0] <= p[1] && e[1].indexOf(p[2]) === 0; }) && p[1] > a; });
