@@ -30,6 +30,10 @@ h1{font-size:24px;font-weight:900;margin:0;line-height:1.35;text-wrap:balance}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
 h2{font-size:15px;margin:0 0 10px;font-weight:700;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 h2 small{font-size:12px;color:var(--muted);font-weight:400}
+.hero-l{grid-column:1/-1}
+.hero-l,.nd-l{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em}
+.nd-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.nd-row b{font-size:22px;font-weight:900}.nd-row small{font-size:12.5px;color:var(--ink2)}
 .hm{display:flex;flex-direction:column;gap:8px;border-width:2px}
 .hm-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .hm-label{font-weight:700;font-size:15px}
@@ -228,16 +232,17 @@ function render() {
     '<div class="asof">' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）までの Airレジ実績・売上は税込</div>' +
     '<div class="asof">更新 ' + DATA.updated + '</div></header>%%MONTH%%';
 
-  // 最新の営業日
-  var maxV = Math.max(L[2] * 1.05, y[0]);
-  h += '<section class="card"><h2>' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）の結果</h2><div class="hero">' +
+  // 最新の営業日（ページの一番上。本店＋2ND）
+  var maxV = Math.max(L[2] * 1.05, y[0]), nd2 = DATA.nd && DATA.nd[a];
+  var ndRow = '<div class="nd-row"><span class="nd-l">2ND</span>' + (nd2 ? '<b class="num">' + man(nd2[0]) + '円</b><small>' + (nd2[1] ? '客数 ' + nd2[1] + '名・客単価 ' + yen(nd2[0] / nd2[1]) : '') + '</small>' : '<small>この日の数字はまだありません</small>') + '</div>';
+  var dayHtml = '<section class="card"><h2>' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）の売上<small>本店・2ND（税込）</small></h2><div class="hero"><div class="hero-l">本店</div>' +
     '<div class="big num">' + man(y[0]) + '<span>円</span></div><div class="badge ' + mk[2] + '">' + mk[0] + ' ' + mk[1] + '</div>' +
     '<div class="sub">' + (y[1] ? '客数 <b class="num">' + y[1] + '名</b>　客単価 <b class="num">' + yen(y[0] / y[1]) + '</b>' : '') +
     (r === 'win' ? '　金星まで あと <b class="num">' + man(L[1] - y[0]) + '</b>' : r === 'loss' ? '　白星まで あと <b class="num">' + man(L[0] - y[0]) + '</b>' : '') + '</div>' +
     '<div class="ladder"><div class="track"><div class="fill" style="width:' + (y[0] / maxV * 100) + '%"></div>' +
     L.map(function (v, k) { return '<div class="tick' + (k ? ' g' : '') + '" style="left:' + (v / maxV * 100) + '%"></div>'; }).join('') + '</div>' +
     '<div class="tags2">' + L.map(function (v, k) { return '<span><i class="k' + k + '"></i>' + ['白星', '金星', 'トロフィー'][k] + ' ' + manL(v) + '</span>'; }).join('') + '</div></div>' +
-    '</div></section>';
+    '</div>' + ndRow + '</section>';
 
   // 次の営業日の目標
   if (next) {
@@ -349,12 +354,18 @@ function render() {
     DATA.best.map(function (p, k) { return '<li><span class="rk num">' + (k + 1) + '</span><span class="nm">' + p[0] + '<small>1日あたり 約' + (p[2] || Math.round(p[1] / bd)) + '個</small></span><span class="v num">' + p[1].toLocaleString('ja-JP') + '個</span></li>'; }).join('') +
     '</ol><p class="hint">午後の焼き足しは、この5品を最優先に。売り切れはお客様の「また来ます」につながります。</p></section>';
 
+  // Uber の売れ筋（Uber Eats Manager の「売れ筋の商品」CSV）
+  var UB = DATA.uberBest;
+  if (UB && UB.items && UB.items.length) h += '<section class="card"><h2>Uber の売れ筋<small>Uber Eats 売れた個数（' + UB.period + '）</small></h2><ol class="list">' +
+    UB.items.map(function (p, k) { return '<li><span class="rk num">' + (k + 1) + '</span><span class="nm">' + p[0] + '<small>' + yen(p[2]) + '</small></span><span class="v num">' + p[1].toLocaleString('ja-JP') + '個</span></li>'; }).join('') +
+    '</ol><p class="hint">Uber は全' + UB.kinds + '品・' + UB.total + '個。上の商品は、Uber の受付中に品切れにしないように。</p></section>';
+
   // フェア商品（期間中だけ。売れた順。まだ取り込みがない商品は「—」）
-  var F = DATA.fair;
+  var F = DATA.fair, fairHtml = '';
   if (F && F.items && F.items.length) {
     var fi = F.items.slice().sort(function (a, b) { return (b[2] == null ? -1 : b[2]) - (a[2] == null ? -1 : a[2]); });
     var fsold = fi.filter(function (p) { return p[2] != null; }).length;
-    h += '<section class="card"><h2>' + F.name + '<small>' + Number(F.to.slice(5, 7)) + '/' + Number(F.to.slice(8)) + 'まで・' + (F.period ? 'Airレジ 売れた個数（' + F.period + '）' : '数字はまだありません') + '</small></h2><ol class="list">' +
+    fairHtml = '<section class="card"><h2>' + F.name + '<small>' + Number(F.to.slice(5, 7)) + '/' + Number(F.to.slice(8)) + 'まで・' + (F.period ? 'Airレジ 売れた個数（' + F.period + '）' : '数字はまだありません') + '</small></h2><ol class="list">' +
       fi.map(function (p, k) { return '<li><span class="rk num">' + (p[2] != null ? k + 1 : '・') + '</span><span class="nm">' + p[0] + '<small>¥' + p[1] + '（税抜）' + (p[2] && F.days ? '・1日あたり 約' + Math.max(1, Math.round(p[2] / F.days)) + '個' : '') + '</small></span><span class="v num">' + (p[2] != null ? p[2].toLocaleString('ja-JP') + '個' : '—') + '</span></li>'; }).join('') +
       '</ol><p class="hint">' + (fsold ? '上の商品は午後も切らさない。動きの遅い商品は入口側に出して、お会計で一言おすすめを。' : '次に Airレジの「バリエーション別売上」を取り込むと、売れた個数が入ります。') + '</p></section>';
   }
@@ -375,7 +386,7 @@ function render() {
   // 月末までみんなでやること（目標のすぐ下に出す）
   var focusHtml = DATA.focus && DATA.focus.length ? '<section class="card"><h2>月末まで、みんなでやること</h2><ol class="focus">' +
     DATA.focus.map(function (f) { return '<li><div><b>' + f[0] + '</b><span>' + f[1] + '</span></div></li>'; }).join('') + '</ol><p class="hint" style="margin:12px 0 0"><b>目標達成まで、あと少し。月末まで、みんなで頑張りましょう！</b></p></section>' : '';
-  h = h.replace('%%MONTH%%', monthHtml + focusHtml + splitHtml);
+  h = h.replace('%%MONTH%%', dayHtml + monthHtml + fairHtml + focusHtml + splitHtml);   // 並び：当日の売上（本店・2ND）→ 月の進み具合 → フェア → やること → 内訳
   document.getElementById('app').innerHTML = h;
 }
 </script>
