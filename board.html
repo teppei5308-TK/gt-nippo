@@ -232,17 +232,16 @@ function render() {
     '<div class="asof">' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）までの Airレジ実績・売上は税込</div>' +
     '<div class="asof">更新 ' + DATA.updated + '</div></header>%%MONTH%%';
 
-  // 最新の営業日（ページの一番上。本店＋2ND）
-  var maxV = Math.max(L[2] * 1.05, y[0]), nd2 = DATA.nd && DATA.nd[a];
-  var ndRow = '<div class="nd-row"><span class="nd-l">2ND</span>' + (nd2 ? '<b class="num">' + man(nd2[0]) + '円</b><small>' + (nd2[1] ? '客数 ' + nd2[1] + '名・客単価 ' + yen(nd2[0] / nd2[1]) : '') + '</small>' : '<small>この日の数字はまだありません</small>') + '</div>';
-  var dayHtml = '<section class="card"><h2>' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）の売上<small>本店・2ND（税込）</small></h2><div class="hero"><div class="hero-l">本店</div>' +
+  // 最新の営業日（ページの一番上。本店のみ・2ND は出さない 2026/10/20）
+  var maxV = Math.max(L[2] * 1.05, y[0]);
+  var dayHtml = '<section class="card"><h2>' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）の売上<small>本店（税込）</small></h2><div class="hero">' +
     '<div class="big num">' + man(y[0]) + '<span>円</span></div><div class="badge ' + mk[2] + '">' + mk[0] + ' ' + mk[1] + '</div>' +
     '<div class="sub">' + (y[1] ? '客数 <b class="num">' + y[1] + '名</b>　客単価 <b class="num">' + yen(y[0] / y[1]) + '</b>' : '') +
     (r === 'win' ? '　金星まで あと <b class="num">' + man(L[1] - y[0]) + '</b>' : r === 'loss' ? '　白星まで あと <b class="num">' + man(L[0] - y[0]) + '</b>' : '') + '</div>' +
     '<div class="ladder"><div class="track"><div class="fill" style="width:' + (y[0] / maxV * 100) + '%"></div>' +
     L.map(function (v, k) { return '<div class="tick' + (k ? ' g' : '') + '" style="left:' + (v / maxV * 100) + '%"></div>'; }).join('') + '</div>' +
     '<div class="tags2">' + L.map(function (v, k) { return '<span><i class="k' + k + '"></i>' + ['白星', '金星', 'トロフィー'][k] + ' ' + manL(v) + '</span>'; }).join('') + '</div></div>' +
-    '</div>' + ndRow + '</section>';
+    '</div></section>';
 
   // 次の営業日の目標
   if (next) {
