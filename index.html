@@ -104,6 +104,15 @@
     <p class="hint">iPad のスクリーンショット（ホームボタン＋電源ボタン）を選ぶと、文字がはっきりして読み取りが正確です。写真で撮るときは画面に正面から。</p>
   </div>
 
+  <div class="card hide" id="uberCard">
+    <p class="q">Uber Eats <small>今日の売上（月の目標に入ります）</small></p>
+    <label class="ph" id="phUber" style="min-height:72px"><b>Uber Eats タブレットの「注文履歴」</b><span>左上の日付と、右上の「売り上げ」「注文一覧」の数が入るように</span><input type="file" accept="image/*" id="inUber"></label>
+    <div class="chips" data-name="uberNone" style="margin-top:10px"><span class="chip">今日は Uber の注文なし</span></div>
+    <p class="lab">写真が読めないとき・手で入れるとき</p>
+    <div class="photo"><input type="number" inputmode="numeric" id="uberSales" placeholder="売上（円）"><input type="number" inputmode="numeric" id="uberOrders" placeholder="注文数"></div>
+    <p class="hint">手で入れた数字があれば、写真より優先します。</p>
+  </div>
+
   <div class="card hide" id="prodCard">
     <p class="q">製造表（紙） <small>表・裏の写真</small></p>
     <label class="ph" style="min-height:56px"><b>＋ 製造表の写真を追加</b><span>表と裏の2枚（ページがあれば全部）</span><input type="file" accept="image/*" id="inProd"></label>
@@ -180,7 +189,8 @@
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };
-  var photoDaily = null, photoCat = null, photoItems = [], photoProd = [];
+  var photoDaily = null, photoCat = null, photoItems = [], photoProd = [], photoUber = null;
+  var UBER_STORES = ['TERRAS 本店'];   // Uber Eats をやっている店舗
   var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
 
   function el(tag, attrs, kids) { var e = document.createElement(tag); for (var k in (attrs || {})) { if (k === 'text') e.textContent = attrs[k]; else if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); } (kids || []).forEach(function (c) { if (c) e.appendChild(c); }); return e; }
@@ -213,11 +223,11 @@
     var CLOSE = MODE === '締め', MAKE = MODE === '製造', EARLY = MODE === '早番', CLEANM = MODE === '清掃';
     show('cleanBox', CLEANM);
     if (CLEANM) {
-      show('main', !!STORE); ['weatherCard', 'regiCard', 'noteCard', 'commentCard', 'partsCard', 'prodCard'].forEach(function (id) { show(id, false); });
+      show('main', !!STORE); ['weatherCard', 'regiCard', 'uberCard', 'noteCard', 'commentCard', 'partsCard', 'prodCard'].forEach(function (id) { show(id, false); });
       document.getElementById('send').textContent = '清掃を記録する'; renderClean(); return;
     }
     show('main', !!(STORE && MODE));
-    show('weatherCard', CLOSE); show('regiCard', CLOSE); show('noteCard', MAKE); show('commentCard', !MAKE); show('effortBox', CLOSE);
+    show('weatherCard', CLOSE); show('regiCard', CLOSE); show('uberCard', CLOSE && UBER_STORES.indexOf(STORE) >= 0); show('noteCard', MAKE); show('commentCard', !MAKE); show('effortBox', CLOSE);
     document.getElementById('send').textContent = CLOSE ? '日報を送信する' : (MODE ? MODE + 'の分を登録する' : '送信する');
     var pc = document.getElementById('partsCard'), plist = (PARTS[STORE] || []).concat((DENGON[STORE] || []).map(function (d) {
       return { kind: 'LINEの伝言', name: d.name, time: d.time, lines: d.pos.map(function (x) { return '良い：' + x; }).concat(d.neg.map(function (x) { return '気になる：' + x; })).concat(d.text ? [d.text] : []) }; }));
@@ -318,6 +328,7 @@
   }
   single('inDaily', 'phDaily', function (d) { photoDaily = d; });
   single('inCat', 'phCat', function (d) { photoCat = d; });
+  single('inUber', 'phUber', function (d) { photoUber = d; });
   document.getElementById('inItems').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
     shrink(f, function (d) { photoItems.push(d); drawThumbs(); e.target.value = ''; });
@@ -532,8 +543,15 @@
     if (photoCat) photos.push({ name: '販売商品（カテゴリ）', dataUrl: photoCat });
     photoItems.forEach(function (d, i) { photos.push({ name: '販売商品（商品ごと）' + (i + 1), dataUrl: d }); });
     if (!document.getElementById('prodCard').classList.contains('hide')) photoProd.forEach(function (d, i) { photos.push({ name: '製造表' + (i + 1), dataUrl: d }); });
+    var uber = null;
+    if (!document.getElementById('uberCard').classList.contains('hide')) {
+      var us = document.getElementById('uberSales').value, uo = document.getElementById('uberOrders').value;
+      uber = { none: !!val('uberNone'), sales: us !== '' ? Number(us) : '', orders: uo !== '' ? Number(uo) : '' };
+      if (photoUber && !uber.none) photos.push({ name: 'Uber', dataUrl: photoUber });
+      if (!uber.none && !photoUber && us === '') uber = null;
+    }
     var payload = {
-      store: STORE, weather: val('weather'), photos: photos, mfg: mfg, nums: nums, texts: texts,
+      store: STORE, weather: val('weather'), photos: photos, mfg: mfg, nums: nums, texts: texts, uber: uber,
       ar: Object.keys(arMap).map(function (k) { return arMap[k]; }),
       review: { asked: rvA && rvA.value !== '' ? Number(rvA.value) : '', total: rvT && rvT.value !== '' ? Number(rvT.value) : '' },
       comments: { custom: custom, role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim(), effort: document.getElementById('cEffort').value.trim(), next: document.getElementById('cNext').value.trim() },
