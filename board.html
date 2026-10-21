@@ -167,6 +167,7 @@ h2 small{font-size:12px;color:var(--muted);font-weight:400}
 .focus b{display:block}
 .focus span{font-size:14px;color:var(--ink2)}
 footer{font-size:12.5px;color:var(--muted);line-height:1.7}
+.fair-details-title{margin:0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .fair-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .fair-period{background:var(--ground);border-radius:10px;padding:12px;min-width:0}
 .fair-period>span{display:block;font-size:13px;font-weight:700;color:var(--ink2)}
@@ -290,8 +291,8 @@ function renderFair(F) {
   function cell(it) { return '<td><b class="num">' + fairQty(it && it.quantity) + '</b><small class="fair-meta num">' + fairYen(it && it.amountExTax) + '</small></td>'; }
   return '<section class="card" data-fair-view="daily-cumulative-v1"><h2>' + title + '<small>' + fairEscape(range) + '・本店</small></h2>' +
     '<div class="fair-summary">' + fairSummary(D, '当日') + fairSummary(C, '期間累計') + '</div>' +
-    (names.length ? '<details class="evd"><summary>対象' + names.length + '商品の内訳</summary><div class="evt-wrap"><table class="evt fair-table"><thead><tr><th>商品</th><th>当日<small>数量 / 売上（税抜）</small></th><th>期間累計<small>数量 / 売上（税抜）</small></th></tr></thead><tbody>' +
-      names.map(function (n) { return '<tr><td>' + fairEscape(n) + '</td>' + cell(dayItems[n]) + cell(totalItems[n]) + '</tr>'; }).join('') + '</tbody></table></div></details>' : '') +
+    (names.length ? '<div class="evd"><h3 class="fair-details-title">対象' + names.length + '商品の内訳</h3><div class="evt-wrap"><table class="evt fair-table"><thead><tr><th>商品</th><th>当日<small>数量 / 売上（税抜）</small></th><th>期間累計<small>数量 / 売上（税抜）</small></th></tr></thead><tbody>' +
+      names.map(function (n) { return '<tr><td>' + fairEscape(n) + '</td>' + cell(dayItems[n]) + cell(totalItems[n]) + '</tr>'; }).join('') + '</tbody></table></div></div>' : '') +
     '<p class="fair-meta">売上は実売金額の税抜集計です。未取得日は0として扱いません。</p></section>';
 }
 
