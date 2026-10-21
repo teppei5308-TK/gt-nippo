@@ -167,6 +167,17 @@ h2 small{font-size:12px;color:var(--muted);font-weight:400}
 .focus b{display:block}
 .focus span{font-size:14px;color:var(--ink2)}
 footer{font-size:12.5px;color:var(--muted);line-height:1.7}
+.fair-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.fair-period{background:var(--ground);border-radius:10px;padding:12px;min-width:0}
+.fair-period>span{display:block;font-size:13px;font-weight:700;color:var(--ink2)}
+.fair-period>small{display:block;font-size:12px;color:var(--muted)}
+.fair-period>b{display:block;font-size:30px;font-weight:900;line-height:1.3;margin-top:6px}
+.fair-period>strong{display:block;font-size:22px;line-height:1.3}
+.fair-period>em{display:block;font-size:12px;font-style:normal;color:var(--warn);min-height:1.5em;margin-top:4px}
+.fair-meta{display:block;font-size:11.5px;font-weight:400;line-height:1.6;color:var(--muted);margin:8px 0 0;overflow-wrap:anywhere}
+.fair-table td:first-child{width:46%}.fair-table td{vertical-align:top}.fair-table td small{margin:0}
+@media(max-width:380px){.fair-summary{gap:6px}.fair-period{padding:10px 8px}.fair-period>b{font-size:25px}.fair-period>strong{font-size:19px}}
+
 </style>
 
 </head>
@@ -214,6 +225,76 @@ function todayBox(s, L) {
     '<div class="bar"><i style="width:' + (t.sales / mx * 100) + '%"></i>' + L.map(function (v) { return '<u style="left:' + (v / mx * 100) + '%"></u>'; }).join('') + '</div>' +
     '<p class="hint" style="margin:6px 0 0">' + msg + '　客数 <b class="num">' + t.cust + '名</b></p></div>';
 }
+// board.html の表示用。数量・実売金額はサーバーの集計値を表示し、売上日報へ加算しない。
+function fairEscape(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fairValue(v) { return typeof v === 'number' && isFinite(v) && v >= 0 ? v : null; }
+function fairQty(v) { return fairValue(v) == null ? '未取得' : v.toLocaleString('ja-JP') + '個'; }
+function fairYen(v) { return fairValue(v) == null ? '未取得' : '¥' + Math.round(v).toLocaleString('ja-JP'); }
+function fairDate(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8)) : '期間未確認';
+}
+function fairRange(p) {
+  if (!p) return '期間未確認';
+  if (p.date) return fairDate(p.date);
+  return p.from && p.to ? fairDate(p.from) + '〜' + fairDate(p.to) : '期間未確認';
+}
+function fairClock(s) {
+  var d = s && new Date(s);
+  return d && !isNaN(d.getTime()) ? d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) + ' JST' : null;
+}
+function fairMeta(p) {
+  if (!p) return '';
+  var out = [], sourceAt = fairClock(p.sourceUpdatedAt), importedAt = fairClock(p.importedAt);
+  out.push(sourceAt ? 'Airレジ更新 ' + sourceAt : 'Airレジ更新時刻は未取得');
+  if (importedAt) out.push('データ取込 ' + importedAt);
+  if (p.missingDates && p.missingDates.length) out.push('未取得日：' + p.missingDates.map(fairDate).join('・'));
+  (p.warnings || []).forEach(function (w) { out.push(w); });
+  return out.map(fairEscape).join('<br>');
+}
+function fairSummary(p, title) {
+  var available = p && p.available === true;
+  return '<div class="fair-period"><span>' + title + '</span><small>' + fairEscape(fairRange(p)) + '</small>' +
+    '<b class="num">' + (available ? fairQty(p.quantity) : '未取得') + '</b>' +
+    '<strong class="num">' + (available ? fairYen(p.amountExTax) : '未取得') + '</strong><small>売上（税抜）</small>' +
+    '<em>' + (available ? (p.complete === true ? '' : '取得済み分・一部未確認') + (p.provisional === false && p.complete === true ? '確定値' : '・途中集計') : '数字はまだありません').replace(/^・/, '') + '</em>' +
+    '<p class="fair-meta">' + fairMeta(p) + '</p></div>';
+}
+function renderFair(F) {
+  if (!F) return '';
+  var title = fairEscape(F.name || 'フェア'), range = F.from && F.to ? fairDate(F.from) + '〜' + fairDate(F.to) : fairDate(F.to) + 'まで';
+  // 旧 GAS の応答は最新の一期間のみ。累計や当日を推測せず従来の数字を期間付きで表示。
+  if (!F.daily && !F.cumulative) {
+    var oldItems = (F.items || []).slice().sort(function (a, b) { return (b[2] == null ? -1 : b[2]) - (a[2] == null ? -1 : a[2]); });
+    return '<section class="card"><h2>' + title + '<small>' + fairEscape(range) + '</small></h2>' +
+      '<p class="hint">当日・期間累計の集計データはまだありません。</p><p class="fair-meta">直近の取込：' + fairEscape(F.period || '未取得') + '。集計更新時刻は未取得です。</p>' +
+      '<ul class="list">' + oldItems.map(function (p) { return '<li><span class="nm">' + fairEscape(p[0]) + '</span><span class="v num">' + fairQty(p[2]) + '<small class="fair-meta">' + fairYen(p[3]) + '（税抜）</small></span></li>'; }).join('') + '</ul></section>';
+  }
+  var D = F.daily, C = F.cumulative, names = [], seen = Object.create(null), dayItems = Object.create(null), totalItems = Object.create(null);
+  function index(p, out) {
+    ((p && p.items) || []).forEach(function (it) {
+      var n = String(it.name || '');
+      if (!n) return;
+      out[n] = it;
+      if (!seen[n]) { names.push(n); seen[n] = true; }
+    });
+  }
+  index(C, totalItems); index(D, dayItems);
+  names.sort(function (a, b) {
+    var av = fairValue((totalItems[a] || {}).quantity), bv = fairValue((totalItems[b] || {}).quantity);
+    return (bv == null ? -1 : bv) - (av == null ? -1 : av);
+  });
+  function cell(it) { return '<td><b class="num">' + fairQty(it && it.quantity) + '</b><small class="fair-meta num">' + fairYen(it && it.amountExTax) + '</small></td>'; }
+  return '<section class="card" data-fair-view="daily-cumulative-v1"><h2>' + title + '<small>' + fairEscape(range) + '・本店</small></h2>' +
+    '<div class="fair-summary">' + fairSummary(D, '当日') + fairSummary(C, '期間累計') + '</div>' +
+    (names.length ? '<details class="evd"><summary>対象' + names.length + '商品の内訳</summary><div class="evt-wrap"><table class="evt fair-table"><thead><tr><th>商品</th><th>当日<small>数量 / 売上（税抜）</small></th><th>期間累計<small>数量 / 売上（税抜）</small></th></tr></thead><tbody>' +
+      names.map(function (n) { return '<tr><td>' + fairEscape(n) + '</td>' + cell(dayItems[n]) + cell(totalItems[n]) + '</tr>'; }).join('') + '</tbody></table></div></details>' : '') +
+    '<p class="fair-meta">売上は実売金額の税抜集計です。未取得日は0として扱いません。</p></section>';
+}
+
 function render() {
   var a = DATA.asof, ad = d8(a), y = DATA.days[a], L = lineOf(a), r = result(a), mk = MARK[r];
   var ym = a.slice(0, 7), y0 = ad.getFullYear(), m0 = ad.getMonth(), last = new Date(y0, m0 + 1, 0).getDate();
@@ -358,15 +439,8 @@ function render() {
     UB.items.map(function (p, k) { return '<li><span class="rk num">' + (k + 1) + '</span><span class="nm">' + p[0] + '<small>' + yen(p[2]) + '</small></span><span class="v num">' + p[1].toLocaleString('ja-JP') + '個</span></li>'; }).join('') +
     '</ol><p class="hint">Uber は全' + UB.kinds + '品・' + UB.total + '個。上の商品は、Uber の受付中に品切れにしないように。</p></section>';
 
-  // フェア商品（期間中だけ。売れた順。まだ取り込みがない商品は「—」）
-  var F = DATA.fair, fairHtml = '';
-  if (F && F.items && F.items.length) {
-    var fi = F.items.slice().sort(function (a, b) { return (b[2] == null ? -1 : b[2]) - (a[2] == null ? -1 : a[2]); });
-    var fsold = fi.filter(function (p) { return p[2] != null; }).length;
-    fairHtml = '<section class="card"><h2>' + F.name + '<small>' + Number(F.to.slice(5, 7)) + '/' + Number(F.to.slice(8)) + 'まで・' + (F.period ? 'Airレジ 売れた個数（' + F.period + '）' : '数字はまだありません') + '</small></h2><ol class="list">' +
-      fi.map(function (p, k) { return '<li><span class="rk num">' + (p[2] != null ? k + 1 : '・') + '</span><span class="nm">' + p[0] + '<small>¥' + p[1] + '（税抜）' + (p[2] && F.days ? '・1日あたり 約' + Math.max(1, Math.round(p[2] / F.days)) + '個' : '') + '</small></span><span class="v num">' + (p[2] != null ? p[2].toLocaleString('ja-JP') + '個' : '—') + '</span></li>'; }).join('') +
-      '</ol><p class="hint">' + (fsold ? '上の商品は午後も切らさない。動きの遅い商品は入口側に出して、お会計で一言おすすめを。' : '次に Airレジの「バリエーション別売上」を取り込むと、売れた個数が入ります。') + '</p></section>';
-  }
+  // 当日・期間累計を分けて表示。旧応答では直近の取込だけを表示。
+  var fairHtml = renderFair(DATA.fair);
 
   // 残り
   var P = DATA.prod;
