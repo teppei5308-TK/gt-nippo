@@ -135,6 +135,22 @@
     <textarea id="pNote" placeholder="例：明日の食パンは粉の入荷待ちで15本まで"></textarea>
   </div>
 
+  <div class="card hide" id="memoCard">
+    <p class="q">お客様の声・気づき <small>手書きメモの写真・任意</small></p>
+    <label class="ph" id="phMemo"><b>＋ 感想メモの写真を選ぶ</b><span>顧客の個人情報を隠した写真を選んでください</span><input type="file" accept="image/*" id="inMemo"></label>
+    <p class="hint">数字表とは分けて読み取ります。文字起こし案を確認してからコメントへ追加します。</p>
+    <button type="button" id="readMemo" disabled>文字起こし案を確認</button>
+    <button type="button" id="removeMemo">写真を外す</button>
+    <p class="hint" id="memoStatus" aria-live="polite"></p>
+    <div class="hide" id="memoReview">
+      <label for="memoText" class="lab">文字起こし案（修正できます）</label>
+      <textarea id="memoText"></textarea>
+      <p class="hint" id="memoChecks"></p>
+      <label class="hint"><input type="checkbox" id="memoReviewed">原本と見比べ、不明箇所と個人情報を確認しました</label>
+      <button type="button" id="applyMemo" disabled>確認して「お客様の声・気づき」へ追加</button>
+    </div>
+  </div>
+
   <div id="dyn"></div>
 
   <div class="card" id="commentCard">
@@ -200,6 +216,7 @@
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };
   var photoDaily = null, photoCat = null, photoItems = [], photoProd = [], photoUber = null;
+  var MEMO_PHOTO = '', MEMO_APPLIED = false, MEMO_SEQ = 0, MEMO_UNCLEAR = [];
   var UBER_STORES = ['TERRAS 本店'];   // Uber Eats をやっている店舗
   var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
 
@@ -210,8 +227,8 @@
     var c = e.target.closest('.chip'); if (!c) return;
     var g = c.parentElement;
     if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); } else c.classList.toggle('on');
-    if (g.id === 'storeChips') { STORE = c.textContent.trim(); renderDyn(); }
-    if (g.id === 'modeChips') { MODE = c.dataset.mode; renderDyn(); }
+    if (g.id === 'storeChips') { resetCustomerMemo(); STORE = c.textContent.trim(); renderDyn(); }
+    if (g.id === 'modeChips') { resetCustomerMemo(); MODE = c.dataset.mode; renderDyn(); }
     if (g.id === 'cleanArea') { CL_AREA = c.textContent.trim(); renderClean(); }
   });
   // 表示名だけを変え、送信・集計に使う内部値「製造」は維持する。
@@ -233,8 +250,13 @@
     document.getElementById('modeHint').textContent = makeLabel() + '・早番の人は自分の分だけ登録してください。締めの人が送ると、全部まとめて1本の日報になります。';
     var dyn = document.getElementById('dyn'); dyn.innerHTML = '';
     var cfg = CONFIG[STORE] || [];
+    if (STORE === '楽書院') cfg = cfg.filter(function (c) { return !/次回予約/.test(c.section); });
+    document.querySelector('#regiCard .q').firstChild.nodeValue = STORE === '楽書院' ? 'レジの写真 ' : 'Airレジの画面 ';
+    document.querySelector('#phDaily b').textContent = STORE === '楽書院' ? '① レシート（売上・客数）' : '① 日別売上（上の部分）';
+    document.querySelector('#phDaily span').textContent = STORE === '楽書院' ? '日次の精算レシート・従来の売上画面も可' : '売上合計・内消費税等・客数';
     var show = function (id, on) { document.getElementById(id).classList.toggle('hide', !on); };
     var CLOSE = MODE === '締め', MAKE = MODE === '製造', EARLY = MODE === '早番', CLEANM = MODE === '清掃';
+    show('memoCard', STORE === '楽書院' && CLOSE);
     show('cleanBox', CLEANM);
     if (CLEANM) {
       show('main', !!STORE); ['weatherCard', 'regiCard', 'uberCard', 'noteCard', 'commentCard', 'partsCard', 'prodCard'].forEach(function (id) { show(id, false); });
@@ -267,7 +289,7 @@
     var cms = cfg.filter(function (c) { return c.type === 'コメント'; });
     document.getElementById('defaultComments').style.display = cms.length ? 'none' : '';
     var cc = document.getElementById('customComments'); cc.innerHTML = '';
-    cms.forEach(function (c) { cc.appendChild(el('p', { class: 'lab', text: c.section })); cc.appendChild(el('textarea', { 'data-cm': c.name })); });
+    cms.forEach(function (c) { cc.appendChild(el('p', { class: 'lab', text: STORE === '楽書院' && c.name === 'お客様の声' ? 'お客様の声・気づき' : c.section })); cc.appendChild(el('textarea', { 'data-cm': c.name })); });
     if (!CLOSE) auto = [];
     if (hasProd && CLOSE) auto.push('製造表から：作った数・残り' + (cfg.some(function (c) { return c.name === '製造ミス'; }) ? '・製造ミス' : '') + (mfgItems.length ? '・' + mfgItems.map(function (c) { return c.name; }).join('・') + 'の製造数' : ''));
     if (EARLY) mfgItems = [];
@@ -375,6 +397,73 @@
       t.appendChild(el('div', { class: 'thumb' }, [im, b]));
     });
   }
+
+  // ---------- 感想メモ：数字のOCRとは分け、確認してから既存のコメントへ追加 ----------
+  function resetCustomerMemo() {
+    MEMO_SEQ++; MEMO_PHOTO = ''; MEMO_APPLIED = false; MEMO_UNCLEAR = [];
+    document.getElementById('inMemo').value = '';
+    document.getElementById('phMemo').classList.remove('ok');
+    var old = document.querySelector('#phMemo img'); if (old) old.remove();
+    document.getElementById('memoReview').classList.add('hide');
+    document.getElementById('memoText').value = '';
+    document.getElementById('memoChecks').textContent = '';
+    document.getElementById('memoStatus').textContent = '';
+    document.getElementById('memoReviewed').checked = false;
+    document.getElementById('readMemo').disabled = true;
+    document.getElementById('applyMemo').disabled = true;
+  }
+  document.getElementById('inMemo').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0]; if (!file) return;
+    resetCustomerMemo(); var seq = MEMO_SEQ;
+    shrink(file, function (data) {
+      if (seq !== MEMO_SEQ || STORE !== '楽書院') return;
+      MEMO_PHOTO = data;
+      var box = document.getElementById('phMemo'); box.classList.add('ok');
+      box.insertBefore(el('img', { src: data, alt: '感想メモの確認用写真' }), box.firstChild);
+      document.getElementById('readMemo').disabled = false;
+    }, 1568);
+  });
+  document.getElementById('removeMemo').addEventListener('click', resetCustomerMemo);
+  document.getElementById('readMemo').addEventListener('click', function () {
+    if (STORE !== '楽書院' || MODE !== '締め' || !MEMO_PHOTO) return;
+    var seq = ++MEMO_SEQ, photo = MEMO_PHOTO, token = '';
+    MEMO_APPLIED = false;
+    document.getElementById('readMemo').disabled = true;
+    document.getElementById('applyMemo').disabled = true;
+    document.getElementById('memoReviewed').checked = false;
+    document.getElementById('memoReview').classList.add('hide');
+    document.getElementById('memoStatus').textContent = '文字起こし案を作っています…（日報は保存・送信しません）';
+    try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'previewCustomerMemo', token: token, payload: { store: STORE, photo: { name: '感想メモ', dataUrl: photo } } }) })
+      .then(function (res) { return res.json(); }).then(function (result) {
+        if (seq !== MEMO_SEQ || STORE !== '楽書院' || MODE !== '締め') return;
+        if (!result || !result.ok || result.kind !== 'customer_memo') throw new Error((result && result.error) || '感想メモを読み取れませんでした');
+        document.getElementById('memoText').value = (result.lines || []).join('\n');
+        MEMO_UNCLEAR = (result.unclear || []).filter(function (x) { return typeof x === 'string' && x.trim(); });
+        document.getElementById('memoChecks').textContent = MEMO_UNCLEAR.length ? '要確認：' + MEMO_UNCLEAR.join('／') : '読めない箇所の報告はありません。原本と見比べて確認してください。';
+        document.getElementById('memoReview').classList.remove('hide');
+        document.getElementById('memoStatus').textContent = '原本と見比べて、必要な箇所を直してください。';
+        document.getElementById('readMemo').disabled = false;
+      }).catch(function (e) {
+        if (seq !== MEMO_SEQ) return;
+        document.getElementById('memoStatus').textContent = '文字起こし案を作れませんでした：' + e.message;
+        document.getElementById('readMemo').disabled = false;
+      });
+  });
+  function refreshMemoConfirmation() {
+    document.getElementById('applyMemo').disabled = !document.getElementById('memoReviewed').checked || !document.getElementById('memoText').value.trim();
+  }
+  document.getElementById('memoReviewed').addEventListener('change', refreshMemoConfirmation);
+  document.getElementById('memoText').addEventListener('input', function () { document.getElementById('memoReviewed').checked = false; refreshMemoConfirmation(); });
+  document.getElementById('applyMemo').addEventListener('click', function () {
+    if (STORE !== '楽書院' || MODE !== '締め' || document.getElementById('applyMemo').disabled || MEMO_APPLIED) return;
+    var target = document.querySelector('[data-cm="お客様の声"]') || document.getElementById('cPos');
+    var text = document.getElementById('memoText').value.trim();
+    if (MEMO_UNCLEAR.length) text += '\n（要確認：' + MEMO_UNCLEAR.join('／') + '）';
+    target.value = [target.value.trim(), text].filter(String).join('\n');
+    MEMO_APPLIED = true; document.getElementById('applyMemo').disabled = true;
+    document.getElementById('memoStatus').textContent = '「お客様の声・気づき」へ追加しました。日報の送信はまだ行っていません。';
+  });
 
   // LIFF
   (function initLiff() {
@@ -550,10 +639,11 @@
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
     if (!MODE) { err.textContent = '登録する内容（締め・' + makeLabel() + '・早番）を選んでください'; return; }
+    if (STORE === '楽書院' && MODE === '締め' && MEMO_PHOTO && !MEMO_APPLIED) { err.textContent = '感想メモを確認してコメントへ追加するか、写真を外してください'; return; }
     if (MODE === '清掃') return sendClean();
     if (MODE !== '締め') return sendPart();
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
-    if (!photoDaily) { err.textContent = '①日別売上の画面を入れてください'; return; }
+    if (!photoDaily) { err.textContent = STORE === '楽書院' ? '①レシート（または日別売上画面）を入れてください' : '①日別売上の画面を入れてください'; return; }
     var mfg = {}, nums = {}, texts = {}, arMap = {};
     document.querySelectorAll('[data-mfg]').forEach(function (i) { if (i.value !== '') mfg[i.dataset.mfg] = Number(i.value); });
     document.querySelectorAll('[data-num]').forEach(function (i) { if (i.value !== '') nums[i.dataset.num] = Number(i.value); });
