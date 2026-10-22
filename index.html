@@ -70,7 +70,7 @@
 
   <div class="card">
     <p class="q">登録する内容</p>
-    <div class="chips" id="modeChips"><span class="chip" data-mode="締め">締め（日報を完成）</span><span class="chip" data-mode="製造">製造</span><span class="chip" data-mode="早番">早番・途中で上がる</span><span class="chip" data-mode="清掃">清掃（HACCP）</span></div>
+    <div class="chips" id="modeChips"><span class="chip" data-mode="締め">締め（日報を完成）</span><span class="chip" data-mode="製造">製造</span><span class="chip" data-mode="早番">早番・途中で上がる</span></div>
     <p class="hint" id="modeHint">製造・早番の人は自分の分だけ登録してください。締めの人が送ると、全部まとめて1本の日報になります。</p>
   </div>
 
@@ -97,6 +97,14 @@
     <div class="photo">
       <label class="ph" id="phDaily"><b>① 日別売上（上の部分）</b><span>売上合計・内消費税等・客数</span><input type="file" accept="image/*" id="inDaily"></label>
       <label class="ph" id="phCat"><b>② 販売商品（閉じたまま）</b><span>カテゴリごとの点数・金額</span><input type="file" accept="image/*" id="inCat"></label>
+    </div>
+    <div id="androidPhotoOptions" class="hide">
+      <p class="hint">撮影する場合は上の写真欄、保存済みの写真は下をタップしてください。</p>
+      <div class="photo">
+        <label class="ph" style="min-height:56px"><b>① 保存した写真を選ぶ</b><input type="file" accept="image/*" id="inDailyPick"></label>
+        <label class="ph" style="min-height:56px"><b>② 保存した写真を選ぶ</b><input type="file" accept="image/*" id="inCatPick"></label>
+      </div>
+      <p class="hint">カメラが開かない場合は、スマートフォンのカメラで撮影してから、上の「保存した写真を選ぶ」で添付してください。</p>
     </div>
     <div class="hide" id="itemsBox"><!-- ③ 商品ごとの画面は使わない（2026/10/20。商品の分析はボード・Airレジのデータで） -->
     <p class="lab">③ 販売商品（「すべての項目を開く」を押した画面）</p>
@@ -206,6 +214,8 @@
     if (g.id === 'modeChips') { MODE = c.dataset.mode; renderDyn(); }
     if (g.id === 'cleanArea') { CL_AREA = c.textContent.trim(); renderClean(); }
   });
+  // 表示名だけを変え、送信・集計に使う内部値「製造」は維持する。
+  function makeLabel() { return STORE === '楽書院' ? '厨房' : '製造'; }
   function val(name) { var g = document.querySelector('.chips[data-name="' + name + '"]'); var on = g && g.querySelector('.chip.on'); return on ? on.textContent.trim() : ''; }
 
   // 店舗設定を読み込む
@@ -219,6 +229,8 @@
 
   // 店舗ごとの入力欄
   function renderDyn() {
+    document.querySelector('#modeChips [data-mode="製造"]').textContent = makeLabel();
+    document.getElementById('modeHint').textContent = makeLabel() + '・早番の人は自分の分だけ登録してください。締めの人が送ると、全部まとめて1本の日報になります。';
     var dyn = document.getElementById('dyn'); dyn.innerHTML = '';
     var cfg = CONFIG[STORE] || [];
     var show = function (id, on) { document.getElementById(id).classList.toggle('hide', !on); };
@@ -230,7 +242,7 @@
     }
     show('main', !!(STORE && MODE));
     show('weatherCard', CLOSE); show('regiCard', CLOSE); show('uberCard', CLOSE && UBER_STORES.indexOf(STORE) >= 0); show('noteCard', MAKE); show('commentCard', !MAKE); show('effortBox', CLOSE);
-    document.getElementById('send').textContent = CLOSE ? '日報を送信する' : (MODE ? MODE + 'の分を登録する' : '送信する');
+    document.getElementById('send').textContent = CLOSE ? '日報を送信する' : (MODE ? (MAKE ? makeLabel() : MODE) + 'の分を登録する' : '送信する');
     var pc = document.getElementById('partsCard'), plist = (PARTS[STORE] || []).concat((DENGON[STORE] || []).map(function (d) {
       return { kind: 'LINEの伝言', name: d.name, time: d.time, lines: d.pos.map(function (x) { return '良い：' + x; }).concat(d.neg.map(function (x) { return '気になる：' + x; })).concat(d.text ? [d.text] : []) }; }));
     pc.innerHTML = ''; show('partsCard', CLOSE && plist.length > 0);
@@ -328,6 +340,14 @@
       shrink(f, function (d) { set(d); var box = document.getElementById(boxId); box.classList.add('ok'); var old = box.querySelector('img'); if (old) old.remove(); var pv = document.createElement('img'); pv.src = d; box.insertBefore(pv, box.firstChild); });
     });
   }
+  // Android は写真欄で背面カメラを指定。保存済み写真の入口は capture なしで残す。
+  // LINE 内では Android WebView の対応に依存するため、撮影できない場合も写真を選べる。
+  if (/Android/i.test(navigator.userAgent)) {
+    ['inDaily', 'inCat'].forEach(function (id) { document.getElementById(id).setAttribute('capture', 'environment'); });
+    document.getElementById('androidPhotoOptions').classList.remove('hide');
+  }
+  single('inDailyPick', 'phDaily', function (d) { photoDaily = d; });
+  single('inCatPick', 'phCat', function (d) { photoCat = d; });
   single('inDaily', 'phDaily', function (d) { photoDaily = d; });
   single('inCat', 'phCat', function (d) { photoCat = d; });
   single('inUber', 'phUber', function (d) { photoUber = d; });
@@ -521,7 +541,7 @@
         var note = document.getElementById('doneNote'); note.textContent = 'お疲れさまでした。締めの人が日報を送ると、この内容も入ります。';
         try { var ctx = liff.getContext(); if (ctx && (ctx.type === 'group' || ctx.type === 'room')) liff.sendMessages([{ type: 'text', text: MODE + 'の分を登録しました：' + STORE }]).catch(function () {}); } catch (e) {}
       })
-      .catch(function (e) { btn.disabled = false; btn.textContent = MODE + 'の分を登録する'; err.textContent = '登録に失敗しました: ' + e.message; });
+      .catch(function (e) { btn.disabled = false; btn.textContent = (MODE === '製造' ? makeLabel() : MODE) + 'の分を登録する'; err.textContent = '登録に失敗しました: ' + e.message; });
   }
 
   // 送信
@@ -529,7 +549,7 @@
     if (IS_OT) { sendOT(); return; }
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
-    if (!MODE) { err.textContent = '登録する内容（締め・製造・早番・清掃）を選んでください'; return; }
+    if (!MODE) { err.textContent = '登録する内容（締め・' + makeLabel() + '・早番）を選んでください'; return; }
     if (MODE === '清掃') return sendClean();
     if (MODE !== '締め') return sendPart();
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
