@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://static.line-scdn.net; style-src 'unsafe-inline'; connect-src https://api.line.me https://access.line.me https://liff.line.me https://script.google.com https://script.googleusercontent.com; frame-src 'self' about:; img-src data:; base-uri 'none'; form-action 'none'">
+<title>茶寮 楽書院｜スタッフボード</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f3ed;color:#3d493e;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}.access{max-width:980px;margin:auto;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font-size:14px;font-weight:700}.label{font-size:11px;color:#738071;margin-top:4px}button{font:inherit;border:1px solid #bfcbb7;border-radius:8px;padding:10px 14px;background:#fffdfa;color:#3d493e;cursor:pointer}button:disabled{opacity:.5;cursor:wait}#message{max-width:620px;margin:50px auto;padding:24px;line-height:1.8;background:#fffdfa;border:1px solid #e4e5db;border-radius:14px}#board{width:100%;border:0;display:block;min-height:100vh} [hidden]{display:none!important}@media(max-width:600px){.access{padding:12px}#message{margin:28px 12px}}
+</style>
+</head>
+<body>
+<header class="access"><div><div class="brand">茶寮 楽書院 · スタッフボード</div><div class="label">グレーステラ全体日報 メンバー限定</div></div><button id="refresh" type="button" disabled>確認中</button></header>
+<div id="message" role="status" aria-live="polite">LINEのログイン状態を確認しています。</div>
+<iframe id="board" title="楽書院の業績と予約状況" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+'use strict';
+// This public file contains no sales, reservation or customer data.
+const BOARD_READ_API='https://script.google.com/macros/s/AKfycbz8sujXVoNVzNroSuv_5d-K5j1rEWoGGvR-Luoe2B09jWoxxSjwiz2MVNn-n7TZ4i2pfA/exec';
+const LIFF_ID='2011853204-GVDc6N2x';
+const message=document.getElementById('message'),frame=document.getElementById('board'),refresh=document.getElementById('refresh');
+let ready=false,busy=false,generation=0,timer=null;
+function clearBoard(text){generation++;frame.hidden=true;frame.removeAttribute('srcdoc');message.textContent=text;message.hidden=false;}
+function resetTimer(){clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden)loadBoard();},60000);}
+async function loadBoard(){
+ if(!ready||busy||document.hidden)return;
+ busy=true;refresh.disabled=true;clearBoard('LINE認証とグループへの所属を確認しています。');
+ const current=generation;
+ try{
+  if(!liff.isLoggedIn()){message.textContent='対象グループに参加しているLINEアカウントでログインしてください。';refresh.textContent='LINEでログイン';return;}
+  const token=liff.getAccessToken();if(!token)throw Error('auth');
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
+  let response;
+  try{response=await fetch(BOARD_READ_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'rakushoinBoard',token}),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal});}
+  finally{clearTimeout(timeout);}
+  if(!response.ok)throw Error('network');
+  const data=await response.json();if(current!==generation||document.hidden)return;
+  if(!data.ok||typeof data.html!=='string'){clearBoard('このLINEアカウントでは閲覧できません。グレーステラ全体日報への参加状況を確認してください。');return;}
+  // The frame has an opaque origin and cannot access this page or its LINE session.
+  const sizing='<script>new ResizeObserver(function(){parent.postMessage({kind:"rakushoin-board-height",height:document.documentElement.scrollHeight},"*");}).observe(document.documentElement);<\/script>';
+  frame.srcdoc=data.html.replace('</body>',sizing+'</body>');frame.hidden=false;message.hidden=true;
+ }catch(ignore){if(current===generation)clearBoard('確認できませんでした。通信状態を確認して、もう一度お試しください。');}
+ finally{busy=false;refresh.disabled=false;if(liff.isLoggedIn())refresh.textContent='最新の保存分を表示';resetTimer();}
+}
+refresh.addEventListener('click',()=>{if(!ready)return;if(!liff.isLoggedIn()){liff.login({redirectUri:location.origin+location.pathname});return;}loadBoard();});
+window.addEventListener('message',event=>{if(event.source===frame.contentWindow&&event.data&&event.data.kind==='rakushoin-board-height'){const h=Number(event.data.height);if(Number.isFinite(h)&&h>0&&h<100000)frame.style.height=Math.ceil(h)+'px';}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearBoard('閲覧を再開するときに所属を確認します。');clearTimeout(timer);}else loadBoard();});
+window.addEventListener('pagehide',()=>{clearBoard('閲覧を終了しました。');clearTimeout(timer);});
+window.addEventListener('pageshow',()=>{if(ready&&!document.hidden)loadBoard();});
+(async function(){try{if(typeof liff==='undefined')throw Error('sdk');await liff.init({liffId:LIFF_ID});ready=true;refresh.disabled=false;await loadBoard();}catch(ignore){clearBoard('LINEを確認できませんでした。LINEから開き直してください。');refresh.textContent='再読込';refresh.disabled=false;refresh.onclick=()=>location.reload();}})();
+</script>
+</body>
+</html>
