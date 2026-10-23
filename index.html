@@ -111,6 +111,14 @@
     <label class="ph" style="min-height:56px"><b>＋ 商品ごとの画面を追加</b><input type="file" accept="image/*" id="inItems"></label>
     <div class="thumbs" id="itemThumbs"></div>
     </div>
+    <div id="salesReview" class="hide">
+      <p class="lab">売上と客数の確認</p>
+      <button type="button" id="readSales">写真から読み取る・再読取り</button>
+      <p class="hint" id="salesStatus" aria-live="polite">写真を選ぶと読み取ります。読めない場合は手で入力できます。</p>
+      <div class="photo"><label>総売上（税込・円）<input type="number" min="0" step="1" inputmode="numeric" id="salesGross"></label><label>客数（人）<input type="number" min="0" step="1" inputmode="numeric" id="salesCustomers"></label></div>
+      <label class="hint"><input type="checkbox" id="salesConfirmed">写真と見比べ、税込総売上・客数を確認しました</label>
+      <p class="hint">再読取りや手修正では日報を登録しません。ほかの入力と写真はそのままです。</p>
+    </div>
     <p class="hint">iPad のスクリーンショット（ホームボタン＋電源ボタン）を選ぶと、文字がはっきりして読み取りが正確です。写真で撮るときは画面に正面から。</p>
   </div>
 
@@ -138,7 +146,8 @@
   <div class="card hide" id="memoCard">
     <p class="q">お客様の声・気づき <small>手書きメモの写真・任意</small></p>
     <label class="ph" id="phMemo"><b>＋ 感想メモの写真を選ぶ</b><span>顧客の個人情報を隠した写真を選んでください</span><input type="file" accept="image/*" id="inMemo"></label>
-    <p class="hint">数字表とは分けて読み取ります。文字起こし案を確認してからコメントへ追加します。</p>
+    <p class="hint">写真を添付するだけで送信できます。文字起こしは任意です。未確認の文章はコメントへ追加しません。</p>
+    <details><summary>文字起こしを使う（任意）</summary>
     <button type="button" id="readMemo" disabled>文字起こし案を確認</button>
     <button type="button" id="removeMemo">写真を外す</button>
     <p class="hint" id="memoStatus" aria-live="polite"></p>
@@ -149,6 +158,7 @@
       <label class="hint"><input type="checkbox" id="memoReviewed">原本と見比べ、不明箇所と個人情報を確認しました</label>
       <button type="button" id="applyMemo" disabled>確認して「お客様の声・気づき」へ追加</button>
     </div>
+    </details>
   </div>
 
   <div id="dyn"></div>
@@ -217,6 +227,7 @@
   var profile = { userId: '', displayName: '' };
   var photoDaily = null, photoCat = null, photoItems = [], photoProd = [], photoUber = null;
   var MEMO_PHOTO = '', MEMO_APPLIED = false, MEMO_SEQ = 0, MEMO_UNCLEAR = [];
+  var SALES_SEQ = 0, SALES_BUSY = false, REPORT_REQUEST = '', REPORT_PAYLOAD = null;
   var UBER_STORES = ['TERRAS 本店'];   // Uber Eats をやっている店舗
   var PROD_NUMS = ['店舗分', '閉店時の残数', '製造ミス'];
 
@@ -226,9 +237,10 @@
   document.addEventListener('click', function (e) {
     var c = e.target.closest('.chip'); if (!c) return;
     var g = c.parentElement;
+    if (REPORT_PAYLOAD && (g.id === 'storeChips' || g.id === 'modeChips')) return;
     if (g.dataset.single) { g.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); } else c.classList.toggle('on');
-    if (g.id === 'storeChips') { resetCustomerMemo(); STORE = c.textContent.trim(); renderDyn(); }
-    if (g.id === 'modeChips') { resetCustomerMemo(); MODE = c.dataset.mode; renderDyn(); }
+    if (g.id === 'storeChips' && STORE !== c.textContent.trim()) { if (REPORT_PAYLOAD) return; resetCustomerMemo(); resetSales(); STORE = c.textContent.trim(); renderDyn(); }
+    if (g.id === 'modeChips' && MODE !== c.dataset.mode) { if (REPORT_PAYLOAD) return; resetCustomerMemo(); MODE = c.dataset.mode; renderDyn(); }
     if (g.id === 'cleanArea') { CL_AREA = c.textContent.trim(); renderClean(); }
   });
   // 表示名だけを変え、送信・集計に使う内部値「製造」は維持する。
@@ -257,6 +269,7 @@
     var show = function (id, on) { document.getElementById(id).classList.toggle('hide', !on); };
     var CLOSE = MODE === '締め', MAKE = MODE === '製造', EARLY = MODE === '早番', CLEANM = MODE === '清掃';
     show('memoCard', STORE === '楽書院' && CLOSE);
+    show('salesReview', STORE === '楽書院' && CLOSE);
     show('cleanBox', CLEANM);
     if (CLEANM) {
       show('main', !!STORE); ['weatherCard', 'regiCard', 'uberCard', 'noteCard', 'commentCard', 'partsCard', 'prodCard'].forEach(function (id) { show(id, false); });
@@ -368,9 +381,9 @@
     ['inDaily', 'inCat'].forEach(function (id) { document.getElementById(id).setAttribute('capture', 'environment'); });
     document.getElementById('androidPhotoOptions').classList.remove('hide');
   }
-  single('inDailyPick', 'phDaily', function (d) { photoDaily = d; });
+  single('inDailyPick', 'phDaily', setDailyPhoto);
   single('inCatPick', 'phCat', function (d) { photoCat = d; });
-  single('inDaily', 'phDaily', function (d) { photoDaily = d; });
+  single('inDaily', 'phDaily', setDailyPhoto);
   single('inCat', 'phCat', function (d) { photoCat = d; });
   single('inUber', 'phUber', function (d) { photoUber = d; });
   document.getElementById('inItems').addEventListener('change', function (e) {
@@ -398,6 +411,42 @@
     });
   }
 
+  function resetSales() {
+    SALES_SEQ++; SALES_BUSY = false;
+    document.getElementById('salesGross').value = ''; document.getElementById('salesCustomers').value = '';
+    document.getElementById('salesConfirmed').checked = false;
+    document.getElementById('readSales').disabled = false;
+    document.getElementById('salesStatus').textContent = '写真を選ぶと読み取ります。読めない場合は手で入力できます。';
+  }
+  function setDailyPhoto(d) { photoDaily = d; resetSales(); if (STORE === '楽書院') readSales(); }
+  function readSales() {
+    if (STORE !== '楽書院' || !photoDaily || SALES_BUSY || REPORT_PAYLOAD) return;
+    var seq = ++SALES_SEQ, photo = photoDaily, token = '';
+    SALES_BUSY = true; document.getElementById('readSales').disabled = true;
+    document.getElementById('salesConfirmed').checked = false;
+    document.getElementById('salesStatus').textContent = '総売上・客数を読み取っています…（日報はまだ登録しません）';
+    try { token = liff.getAccessToken() || ''; } catch (e) {}
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'previewSales', token: token, payload: { store: STORE, photo: { name: '日別売上', dataUrl: photo } } }) })
+      .then(function (r) { return r.json(); }).then(function (r) {
+        if (seq !== SALES_SEQ) return;
+        if (!r || !r.ok) throw new Error((r && r.error) || '読取りに失敗しました');
+        var a = r.sales || {}, valid = function (n) { return typeof n === 'number' && isFinite(n) && n >= 0; };
+        // 再読取り失敗時には、入力済みの数字を消さない。
+        if (valid(a.gross_sales)) document.getElementById('salesGross').value = a.gross_sales;
+        if (valid(a.customers)) document.getElementById('salesCustomers').value = a.customers;
+        document.getElementById('salesStatus').textContent = valid(a.gross_sales) && valid(a.customers) ? '読み取った数字を写真と見比べて確認してください。' + (r.note || '') : '読み取れない項目があります。再読取りするか、写真を見て手で入力してください。' + (r.code ? '（' + r.code + '）' : '');
+      }).catch(function (e) {
+        if (seq !== SALES_SEQ) return;
+        document.getElementById('salesStatus').textContent = '読取りに失敗しました。入力と写真は残っています。再読取りか手入力で続けられます。' + e.message;
+      }).then(function () { if (seq === SALES_SEQ) { SALES_BUSY = false; document.getElementById('readSales').disabled = false; } });
+  }
+  document.getElementById('readSales').addEventListener('click', readSales);
+  ['salesGross', 'salesCustomers'].forEach(function (id) { document.getElementById(id).addEventListener('input', function () {
+    // 遅れて返ったOCRで、本人の手修正を上書きしない。
+    SALES_SEQ++; SALES_BUSY = false; document.getElementById('readSales').disabled = false;
+    document.getElementById('salesConfirmed').checked = false;
+  }); });
+
   // ---------- 感想メモ：数字のOCRとは分け、確認してから既存のコメントへ追加 ----------
   function resetCustomerMemo() {
     MEMO_SEQ++; MEMO_PHOTO = ''; MEMO_APPLIED = false; MEMO_UNCLEAR = [];
@@ -421,6 +470,7 @@
       var box = document.getElementById('phMemo'); box.classList.add('ok');
       box.insertBefore(el('img', { src: data, alt: '感想メモの確認用写真' }), box.firstChild);
       document.getElementById('readMemo').disabled = false;
+      document.getElementById('memoStatus').textContent = '写真を添付しました。このまま日報を送信できます。';
     }, 1568);
   });
   document.getElementById('removeMemo').addEventListener('click', resetCustomerMemo);
@@ -459,7 +509,6 @@
     if (STORE !== '楽書院' || MODE !== '締め' || document.getElementById('applyMemo').disabled || MEMO_APPLIED) return;
     var target = document.querySelector('[data-cm="お客様の声"]') || document.getElementById('cPos');
     var text = document.getElementById('memoText').value.trim();
-    if (MEMO_UNCLEAR.length) text += '\n（要確認：' + MEMO_UNCLEAR.join('／') + '）';
     target.value = [target.value.trim(), text].filter(String).join('\n');
     MEMO_APPLIED = true; document.getElementById('applyMemo').disabled = true;
     document.getElementById('memoStatus').textContent = '「お客様の声・気づき」へ追加しました。日報の送信はまだ行っていません。';
@@ -639,9 +688,14 @@
     var err = document.getElementById('err'); err.textContent = '';
     if (!STORE) { err.textContent = '店舗を選んでください'; return; }
     if (!MODE) { err.textContent = '登録する内容（締め・' + makeLabel() + '・早番）を選んでください'; return; }
-    if (STORE === '楽書院' && MODE === '締め' && MEMO_PHOTO && !MEMO_APPLIED) { err.textContent = '感想メモを確認してコメントへ追加するか、写真を外してください'; return; }
     if (MODE === '清掃') return sendClean();
     if (MODE !== '締め') return sendPart();
+    if (REPORT_PAYLOAD) { submitClosing(REPORT_PAYLOAD); return; }
+    if (STORE === '楽書院') {
+      var gross = document.getElementById('salesGross').value, customers = document.getElementById('salesCustomers').value;
+      if (SALES_BUSY) { err.textContent = '売上の読取り中です。少し待つか、手で入力してください'; return; }
+      if (gross === '' || customers === '' || !/^\d+$/.test(gross) || !/^\d+$/.test(customers) || !document.getElementById('salesConfirmed').checked) { err.textContent = '総売上（税込）と客数を入力し、写真と見比べて確認してください'; return; }
+    }
     if (!val('weather')) { err.textContent = '天気を選んでください'; return; }
     if (!photoDaily) { err.textContent = STORE === '楽書院' ? '①レシート（または日別売上画面）を入れてください' : '①日別売上の画面を入れてください'; return; }
     var mfg = {}, nums = {}, texts = {}, arMap = {};
@@ -652,6 +706,7 @@
     var rvA = document.getElementById('rvAsked'), rvT = document.getElementById('rvTotal');
     var custom = {}; document.querySelectorAll('[data-cm]').forEach(function (i) { if (i.value.trim()) custom[i.dataset.cm] = i.value.trim(); });
     var photos = [{ name: '日別売上', dataUrl: photoDaily }];
+    if (STORE === '楽書院' && MEMO_PHOTO) photos.push({ name: '感想メモ', dataUrl: MEMO_PHOTO });
     if (photoCat) photos.push({ name: '販売商品（カテゴリ）', dataUrl: photoCat });
     photoItems.forEach(function (d, i) { photos.push({ name: '販売商品（商品ごと）' + (i + 1), dataUrl: d }); });
     if (!document.getElementById('prodCard').classList.contains('hide')) photoProd.forEach(function (d, i) { photos.push({ name: '製造表' + (i + 1), dataUrl: d }); });
@@ -669,7 +724,15 @@
       comments: { custom: custom, role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim(), effort: document.getElementById('cEffort').value.trim(), next: document.getElementById('cNext').value.trim() },
       name: document.getElementById('name').value
     };
-    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（写真から数字を読み取っています）';
+    if (STORE === '楽書院') payload.salesConfirmation = { confirmed: true, gross_sales: Number(gross), customers: Number(customers) };
+    REPORT_REQUEST = REPORT_REQUEST || ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+    payload.requestId = REPORT_REQUEST; REPORT_PAYLOAD = payload;
+    document.querySelectorAll('#form input, #form textarea, #form select, #form button').forEach(function (i) { if (i.id !== 'send') i.disabled = true; });
+    submitClosing(payload);
+  });
+  function submitClosing(payload) {
+    var err = document.getElementById('err');
+    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（入力と写真を保存しています）';
     var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
     fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'submit', token: token, payload: payload }) })
       .then(function (res) { return res.json(); })
@@ -678,10 +741,12 @@
         document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
         document.getElementById('result').classList.remove('hide');
         document.getElementById('preview').textContent = r.message;
-        postToChat(STORE, r.id, r.message);
+        document.querySelector('#result h1').textContent = '保存しました（受付ID ' + r.id + '）';
+        if (!r.repeated) postToChat(payload.store, r.id, r.message);
+        else document.getElementById('doneNote').textContent = '同じ受付IDで保存済みです。日報の重複登録・トークへの再投稿はしていません。';
       })
-      .catch(function (e) { btn.disabled = false; btn.textContent = '送信する'; err.textContent = '送信に失敗しました: ' + e.message; });
-  });
+      .catch(function (e) { btn.disabled = false; btn.textContent = '同じ受付で再確認する'; err.textContent = '送信結果を確認できませんでした: ' + e.message + '。入力と写真は保持しています。再確認ボタンは同じ内容・受付情報を使います。'; });
+  }
 </script>
 </body>
 </html>
