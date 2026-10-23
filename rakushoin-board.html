@@ -36,7 +36,8 @@ async function loadBoard(){
   if(!data.ok||typeof data.html!=='string'){clearBoard('読み込めませんでした。時間をおいて再度お試しください。');return;}
   // The frame has an opaque origin and cannot access the parent page.
   const sizing='<script>new ResizeObserver(function(){parent.postMessage({kind:"rakushoin-board-height",height:document.documentElement.scrollHeight},"*");}).observe(document.documentElement);<\/script>';
-  frame.srcdoc=data.html.replace('</body>',sizing+'</body>');frame.hidden=false;message.hidden=true;
+  const publicHtml=data.html.replace('スタッフ限定 · スナップショット表示（自動同期は未実装）','スナップショット表示（自動同期は未実装）').replace('表示ごとに対象LINEグループへの所属を確認します。','LINEログインなしで閲覧できます。');
+  frame.srcdoc=publicHtml.replace('</body>',sizing+'</body>');frame.hidden=false;message.hidden=true;
  }catch(ignore){if(current===generation)clearBoard('確認できませんでした。通信状態を確認して、もう一度お試しください。');}
  finally{busy=false;refresh.disabled=false;refresh.textContent='最新の保存分を表示';resetTimer();}
 }
