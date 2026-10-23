@@ -185,23 +185,18 @@ footer{font-size:12.5px;color:var(--muted);line-height:1.7}
 <body>
 <div class="wrap" id="app"></div>
 
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
-var LIFF_ID = '2011853204-GVDc6N2x';
 var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
 var DATA = null;
 function msg(t) { document.getElementById('app').innerHTML = '<p style="padding:40px 0;color:var(--ink2)">' + t + '</p>'; }
-function load(token) {
-  fetch(API_URL + '?action=board&store=' + encodeURIComponent('TERRAS 本店') + '&token=' + encodeURIComponent(token || ''))
+function load() {
+  fetch(API_URL + '?action=board&store=' + encodeURIComponent('TERRAS 本店'))
     .then(function (r) { return r.json(); })
     .then(function (j) { if (!j.ok) throw new Error(j.error || '読み込めませんでした'); DATA = j.board; DATA.today = null; if (!DATA.asof) return msg('今月のデータがまだありません。'); render(); })
     .catch(function (e) { msg('読み込めませんでした（' + e.message + '）。電波の良いところで開き直してください。'); });
 }
 msg('読み込んでいます…');
-liff.init({ liffId: LIFF_ID }).then(function () {
-  if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-  load(liff.getAccessToken());
-}).catch(function () { msg('LINE から開いてください。'); });
+load();
 /* ===== 表示 ===== */
 var WD = ['日', '月', '火', '水', '木', '金', '土'];
 // 非表示にする欄（また使うときはここから外す）：voices＝お客様の声、prod＝残りが多かった商品（製造表）
