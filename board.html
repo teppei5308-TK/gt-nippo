@@ -246,7 +246,9 @@ function fairMeta(p) {
   if (!p) return '';
   var out = [], sourceAt = fairClock(p.sourceUpdatedAt), importedAt = fairClock(p.importedAt);
   out.push(sourceAt ? 'Airレジ更新 ' + sourceAt : 'Airレジ更新時刻は未取得');
+  if (p.downloadedAt) out.push('CSV取得 ' + fairClock(p.downloadedAt));
   if (importedAt) out.push('データ取込 ' + importedAt);
+  if (p.unconfirmedDates && p.unconfirmedDates.length) out.push('未確認日：' + p.unconfirmedDates.map(fairDate).join('・'));
   if (p.missingDates && p.missingDates.length) out.push('未取得日：' + p.missingDates.map(fairDate).join('・'));
   (p.warnings || []).forEach(function (w) { out.push(w); });
   return out.map(fairEscape).join('<br>');
@@ -254,9 +256,9 @@ function fairMeta(p) {
 function fairSummary(p, title) {
   var available = p && p.available === true;
   return '<div class="fair-period"><span>' + title + '</span><small>' + fairEscape(fairRange(p)) + '</small>' +
-    '<b class="num">' + (available ? fairQty(p.quantity) : '未取得') + '</b>' +
-    '<strong class="num">' + (available ? fairYen(p.amountExTax) : '未取得') + '</strong><small>売上（税抜）</small>' +
-    '<em>' + (available ? (p.complete === true ? '' : '取得済み分・一部未確認') + (p.provisional === false && p.complete === true ? '確定値' : '・途中集計') : '数字はまだありません').replace(/^・/, '') + '</em>' +
+    '<b class="num">' + (available ? fairQty(p.complete ? p.quantity : p.knownQuantity) : '未取得') + '</b>' +
+    '<strong class="num">' + (available ? fairYen(p.complete ? p.amountExTax : p.knownAmountExTax) : '未取得') + '</strong><small>売上（税抜）</small>' +
+    '<em>' + (available ? (p.complete === true ? '' : '確認済み分の小計・一部未確認') + (p.provisional === false && p.complete === true ? '確定値' : '・途中集計') : '数字はまだありません').replace(/^・/, '') + '</em>' +
     '<p class="fair-meta">' + fairMeta(p) + '</p></div>';
 }
 function renderFair(F) {
@@ -283,12 +285,16 @@ function renderFair(F) {
     var av = fairValue((totalItems[a] || {}).quantity), bv = fairValue((totalItems[b] || {}).quantity);
     return (bv == null ? -1 : bv) - (av == null ? -1 : av);
   });
-  function cell(it) { return '<td><b class="num">' + fairQty(it && it.quantity) + '</b><small class="fair-meta num">' + fairYen(it && it.amountExTax) + '</small></td>'; }
+  function cell(it) {
+    var partial = it && it.unconfirmedDates && it.unconfirmedDates.length;
+    return '<td><b class="num">' + fairQty(it && (partial ? it.knownQuantity : it.quantity)) + '</b><small class="fair-meta num">' + fairYen(it && (partial ? it.knownAmountExTax : it.amountExTax)) + '</small>' +
+      (partial ? '<small class="fair-meta">確認済み分<br>未確認：' + it.unconfirmedDates.map(fairDate).map(fairEscape).join('・') + '</small>' : '') + '</td>';
+  }
   return '<section class="card" data-fair-view="daily-cumulative-v1"><h2>' + title + '<small>' + fairEscape(range) + '・本店</small></h2>' +
     '<div class="fair-summary">' + fairSummary(D, '当日') + fairSummary(C, '期間累計') + '</div>' +
     (names.length ? '<div class="evd"><h3 class="fair-details-title">対象' + names.length + '商品の内訳</h3><div class="evt-wrap"><table class="evt fair-table"><thead><tr><th>商品</th><th>当日<small>数量 / 売上（税抜）</small></th><th>期間累計<small>数量 / 売上（税抜）</small></th></tr></thead><tbody>' +
       names.map(function (n) { return '<tr><td>' + fairEscape(n) + '</td>' + cell(dayItems[n]) + cell(totalItems[n]) + '</tr>'; }).join('') + '</tbody></table></div></div>' : '') +
-    '<p class="fair-meta">売上は実売金額の税抜集計です。未取得日は0として扱いません。</p></section>';
+    '<p class="fair-meta">売上は実売金額の税抜集計です。未掲載・未確認の商品や日は0として扱いません。小計は確認できた分だけです。</p></section>';
 }
 
 function render() {
