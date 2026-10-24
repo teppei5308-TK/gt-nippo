@@ -178,6 +178,35 @@ footer{font-size:12.5px;color:var(--muted);line-height:1.7}
 .fair-meta{display:block;font-size:11.5px;font-weight:400;line-height:1.6;color:var(--muted);margin:8px 0 0;overflow-wrap:anywhere}
 .fair-table td:first-child{width:46%}.fair-table td{vertical-align:top}.fair-table td small{margin:0}
 @media(max-width:380px){.fair-summary{gap:6px}.fair-period{padding:10px 8px}.fair-period>b{font-size:25px}.fair-period>strong{font-size:19px}}
+/* 売れたメニュー（今日・今月・Uber の全品） */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--ground);border-radius:10px;padding:4px;margin-bottom:12px}
+.seg button{font:inherit;font-size:13.5px;font-weight:700;border:0;border-radius:8px;padding:7px 4px;background:transparent;color:var(--ink2);cursor:pointer;line-height:1.3}
+.seg button small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.ml-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.ml-stats div{background:var(--ground);border-radius:10px;padding:8px 10px}
+.ml-stats span{display:block;font-size:12px;color:var(--ink2)}
+.ml-stats b{font-size:19px;font-weight:900}
+.ml-find{width:100%;font:inherit;font-size:16px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);margin-bottom:6px}
+.ml{list-style:none;margin:0;padding:0}
+.ml li{display:grid;grid-template-columns:26px 1fr auto;gap:2px 8px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}
+.ml li:last-child{border-bottom:0}
+.ml .rk{font-weight:900;color:var(--muted);font-size:13px}
+.ml .nm{min-width:0;font-size:15px}
+.ml .q{font-weight:700;white-space:nowrap;text-align:right}
+.ml .sub{grid-column:2/4;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.ml .sub>.num{white-space:nowrap}
+.ml .sub .b{flex:0 0 32%;height:5px;border-radius:3px;background:var(--loss-soft);overflow:hidden}
+.ml .sub .b i{display:block;height:100%;background:var(--accent)}
+.ml .up{color:var(--accent);font-weight:700}.ml .dn{color:var(--clay);font-weight:700}
+.chip{display:inline-block;font-size:10.5px;font-weight:700;border-radius:5px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.chip.f{background:var(--gold-soft);color:var(--gold)}.chip.k{background:var(--accent-soft);color:var(--accent)}
+.ml-more{width:100%;font:inherit;font-size:13.5px;font-weight:700;color:var(--accent);background:transparent;border:1px dashed var(--line);border-radius:10px;padding:9px;margin-top:8px;cursor:pointer}
+.zero{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.zero h3{font-size:13.5px;margin:0 0 6px}
+.zero h3 small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.zero p{margin:0;font-size:14px;color:var(--ink2)}
+.ml-foot{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.6}
 
 </style>
 
@@ -441,6 +470,10 @@ function render() {
     UB.items.map(function (p, k) { return '<li><span class="rk num">' + (k + 1) + '</span><span class="nm">' + p[0] + '<small>' + yen(p[2]) + '</small></span><span class="v num">' + p[1].toLocaleString('ja-JP') + '個</span></li>'; }).join('') +
     '</ol><p class="hint">Uber は全' + UB.kinds + '品・' + UB.total + '個。上の商品は、Uber の受付中に品切れにしないように。</p></section>';
 
+  // 売れたメニュー（中身は描いたあと renderMenus で入れる。切り替え・検索・全品表示があるため）
+  var MN = DATA.menus;
+  if (MN && (MN.today || MN.month || MN.uber)) h += '<section class="card" id="ml"></section>';
+
   // 当日・期間累計を分けて表示。旧応答では直近の取込だけを表示。
   var fairHtml = renderFair(DATA.fair);
 
@@ -462,6 +495,59 @@ function render() {
     DATA.focus.map(function (f) { return '<li><div><b>' + f[0] + '</b><span>' + f[1] + '</span></div></li>'; }).join('') + '</ol><p class="hint" style="margin:12px 0 0"><b>目標達成まで、あと少し。月末まで、みんなで頑張りましょう！</b></p></section>' : '';
   h = h.replace('%%MONTH%%', dayHtml + monthHtml + fairHtml + focusHtml + splitHtml);   // 並び：当日の売上（本店・2ND）→ 月の進み具合 → フェア → やること → 内訳
   document.getElementById('app').innerHTML = h;
+  if (document.getElementById('ml')) renderMenus();
+}
+
+// 売れたメニュー：今日／今月（Airレジ・パンとお菓子）／Uber 今月 の全品。上位10品から「残りを見る」で全部、名前で絞り込み
+var ML = { tab: null, all: false, q: '' };
+function mlNorm(n) { return String(n).normalize('NFKC').replace(/[（(].*?[)）]/g, '').replace(/TERRAS/gi, '').replace(/[\s・、,の]/g, ''); }
+function mlEsc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function mlWeekday(p) { var m = String(p).match(/^(\d+)\/(\d+)〜/); if (!m) return p; var d = new Date(Number(DATA.asof ? DATA.asof.slice(0, 4) : new Date().getFullYear()), Number(m[1]) - 1, Number(m[2]));
+  return m[1] + '/' + m[2] + '（' + '日月火水木金土'[d.getDay()] + '）'; }
+function renderMenus() {
+  var MN = DATA.menus, el = document.getElementById('ml'), tabs = ['today', 'month', 'uber'].filter(function (k) { return MN[k] && MN[k].items && MN[k].items.length; });
+  if (!tabs.length) { el.remove(); return; }
+  if (tabs.indexOf(ML.tab) < 0) ML.tab = tabs[0];
+  var t = ML.tab, P = MN[t], items = P.items, max = items[0][1];
+  var days = MN.month ? (MN.month.days || 0) : 0, avg = {};
+  if (MN.month && days) MN.month.items.forEach(function (r) { avg[r[0]] = r[1] / days; });
+  var fair = DATA.fair && DATA.fair.items ? DATA.fair.items.map(function (x) { return mlNorm(x[0]); }) : [];
+  var best = (DATA.best || []).map(function (x) { return mlNorm(x[0]); });
+  var label = { today: '今日', month: '今月', uber: 'Uber 今月' }, period = function (k) { return k === 'today' ? mlWeekday(MN[k].period) : MN[k].period; };
+  var row = function (r, k) {
+    var n = mlNorm(r[0]), chips = (t !== 'uber' && fair.indexOf(n) >= 0 ? '<span class="chip f">フェア</span>' : '') + (t !== 'uber' && best.indexOf(n) >= 0 ? '<span class="chip k">切らさない</span>' : '');
+    var sub = yen(r[2]);
+    // フェア商品は月の途中から売り始めるので、月の1日平均は出さない（実際より少なく見える）
+    if (t === 'today' && avg[r[0]] && fair.indexOf(n) < 0) { var a = avg[r[0]], d = r[1] - a;
+      sub += '　平均' + Math.max(1, Math.round(a)) + '個' + (a >= 3 && Math.abs(d) / a >= 0.3 ? (d > 0 ? ' <span class="up">▲多め</span>' : ' <span class="dn">▼少なめ</span>') : ''); }
+    if (t === 'month' && days && fair.indexOf(n) < 0) sub += '　1日 約' + Math.max(1, Math.round(r[1] / days)) + '個';
+    return '<li><span class="rk num">' + (k + 1) + '</span><span class="nm">' + mlEsc(r[0]) + chips + '</span><span class="q num">' + r[1].toLocaleString('ja-JP') + '個</span>' +
+      '<span class="sub"><span class="b"><i style="width:' + Math.max(2, r[1] / max * 100).toFixed(1) + '%"></i></span><span class="num">' + sub + '</span></span></li>';
+  };
+  var qty = items.reduce(function (a, r) { return a + r[1]; }, 0), amt = items.reduce(function (a, r) { return a + r[2]; }, 0);
+  var shownRows = items.map(function (r, k) { return [r, k]; }).filter(function (x) { return !ML.q || mlNorm(x[0][0]).indexOf(mlNorm(ML.q)) >= 0; });
+  var limit = ML.all || ML.q ? shownRows.length : 10;
+  var h = '<h2>売れたメニュー<small>' + (t === 'uber' ? 'Uber Eats' : 'Airレジ・パンとお菓子') + '（' + period(t) + '）</small></h2>';
+  if (tabs.length > 1) h += '<div class="seg" role="tablist" style="grid-template-columns:repeat(' + tabs.length + ',1fr)">' + tabs.map(function (k) {
+    return '<button role="tab" aria-selected="' + (k === t) + '" data-t="' + k + '">' + label[k] + '<small>' + period(k) + '</small></button>'; }).join('') + '</div>';
+  h += '<div class="ml-stats"><div><span>売れた品数</span><b class="num">' + items.length + '</b>品</div><div><span>個数</span><b class="num">' + qty.toLocaleString('ja-JP') + '</b>個</div><div><span>' + (t === 'uber' ? '売上（税込）' : '売上（税抜）') + '</span><b class="num">' + (Math.round(amt / 1000) / 10).toFixed(1) + '</b>万</div></div>';
+  h += '<input class="ml-find" type="search" placeholder="商品名で探す（例：いちじく）" value="' + mlEsc(ML.q) + '">';
+  h += '<ol class="ml">' + shownRows.slice(0, limit).map(function (x) { return row(x[0], x[1]); }).join('') + '</ol>';
+  if (!shownRows.length) h += '<p class="ml-foot">見つかりません。</p>';
+  if (shownRows.length > limit) h += '<button class="ml-more">残り ' + (shownRows.length - limit) + '品を見る</button>';
+  if (t === 'today' && !ML.q && days) {
+    var sold = {}; items.forEach(function (r) { sold[r[0]] = 1; });
+    var zero = MN.month.items.filter(function (r) { return !sold[r[0]] && r[1] / days >= 3; });
+    if (zero.length) h += '<div class="zero"><h3>いつも売れるのに今日は0個<small>今月1日3個以上</small></h3><p>' + zero.map(function (r) { return mlEsc(r[0]) + '（いつも約' + Math.round(r[1] / days) + '個）'; }).join('、') + '</p><p class="ml-foot">作っていない・早く売り切れた・名前の打ち間違い、のどれかです。</p></div>';
+  }
+  h += '<p class="ml-foot">' + (t === 'uber' ? 'Uber は毎日2時半に前日分まで更新されます。今日の分は明日。' : 'ドリンク・物販・袋は除いています。毎日19時に更新。「平均」は今月の1日あたり。▲▼は平均より3割以上多い・少ない。') + '</p>';
+  el.innerHTML = h;
+  el.querySelectorAll('.seg button').forEach(function (b) { b.onclick = function () { ML.tab = b.dataset.t; ML.all = false; ML.q = ''; renderMenus(); }; });
+  var more = el.querySelector('.ml-more'); if (more) more.onclick = function () { ML.all = true; renderMenus(); };
+  // 日本語入力の変換中は描き直さない（確定してから絞り込む）
+  var f = el.querySelector('.ml-find'), apply = function () { ML.q = f.value; var pos = f.selectionStart; renderMenus(); var g = document.querySelector('#ml .ml-find'); g.focus(); g.setSelectionRange(pos, pos); };
+  f.addEventListener('input', function (e) { if (!e.isComposing) apply(); });
+  f.addEventListener('compositionend', apply);
 }
 </script>
 
