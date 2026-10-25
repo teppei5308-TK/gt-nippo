@@ -222,6 +222,9 @@
   // スタッフボードは別ページ。LINE から開くと最初は ?liff.state=%3Fmode%3Dboard の形で届くので、どちらの形でもすぐ移動する
   var TO_BOARD = /mode(=|%3D)board/i.test(location.search + location.hash);
   if (TO_BOARD) location.replace('board.html?mode=board');
+  // 清掃（HACCP）は別ページ（v56）。?mode=清掃 / ?mode=clean で開いたらすぐ移動する
+  var CLEAN_Q = location.search + location.hash; for (var qi = 0; qi < 2; qi++) { try { CLEAN_Q = decodeURIComponent(CLEAN_Q); } catch (e) {} }
+  if (!TO_BOARD && /mode=(clean|清掃)/i.test(CLEAN_Q)) location.replace('clean.html');
   var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };

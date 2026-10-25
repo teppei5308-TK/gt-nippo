@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>清掃ボード</title>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#23262b;--muted:#6f757d;--line:#dcd8cf;--acc:#5E7A4A;--acc2:#2F4858;--warn:#8F6A1C;--bad:#9E3F33}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;line-height:1.55}
+  .wrap{max-width:720px;margin:0 auto;padding:14px 16px 40px}
+  h1{font-size:19px;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;background:#fff;font-size:14px;cursor:pointer}
+  .chip.on{background:var(--acc2);color:#fff;border-color:var(--acc2)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+  .q{font-weight:700;font-size:14px;margin:0 0 6px}
+  .alert{border:2px solid var(--bad);background:#fbf3f1}
+  .alert .q{color:var(--bad)}
+  .day h2{font-size:15px;margin:0 0 8px}
+  .rec{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+  .rec:first-of-type{border-top:0}
+  .ph{width:72px;height:72px;border-radius:8px;border:1px solid var(--line);background:#eee center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;cursor:pointer}
+  .ph.none{cursor:default;background:#f2f0ea}
+  .nm{font-weight:700;line-height:1.35}
+  .meta{font-size:12px;color:var(--muted)}
+  .tag{display:inline-block;font-size:11px;border-radius:4px;padding:0 6px;margin-right:6px;color:#fff;background:var(--acc)}
+  .tag.carry{background:var(--warn)}
+  .tag.skip{background:var(--bad)}
+  .empty{color:var(--muted);font-size:13px}
+  .li{font-size:14px;margin:2px 0}
+  #big{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+  #big img{max-width:100%;max-height:100%;border-radius:6px}
+  .err{color:var(--bad);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>清掃ボード</h1>
+  <p class="sub" id="sub">読み込んでいます…</p>
+  <div class="chips" id="range"><span class="chip on" data-days="7">7日間</span><span class="chip" data-days="14">14日間</span><span class="chip" data-days="31">31日間</span></div>
+  <div id="out"></div>
+</div>
+<div id="big"><img alt=""></div>
+<script>
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
+  function el(tag, attrs, kids) { var e = document.createElement(tag); for (var k in (attrs || {})) { if (k === 'text') e.textContent = attrs[k]; else if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); } (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); }); return e; }
+  function md(ds) { var d = new Date(ds + 'T00:00:00+09:00'); return (d.getMonth() + 1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）'; }
+  function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  var queue = [], busy = 0;
+  function pump() { while (busy < 3 && queue.length) { var job = queue.shift(); busy++; job(function () { busy--; pump(); }); } }
+  function photo(id) {
+    var d = el('div', { class: 'ph', text: '写真' });
+    queue.push(function (done) {
+      fetch(API_URL + '?action=cleanPhoto&id=' + encodeURIComponent(id)).then(function (r) { return r.json(); })
+        .then(function (j) { if (j.ok) { d.style.backgroundImage = 'url(' + j.data + ')'; d.textContent = ''; } else d.textContent = '表示不可'; })
+        .catch(function () { d.textContent = '表示不可'; }).then(done);
+    }); pump();
+    d.onclick = function () {
+      var big = document.getElementById('big'), img = big.querySelector('img'); img.src = ''; big.style.display = 'flex';
+      fetch(API_URL + '?action=cleanPhoto&full=1&id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (j) { if (j.ok) img.src = j.data; });
+    };
+    return d;
+  }
+  document.getElementById('big').onclick = function () { this.style.display = 'none'; };
+  document.getElementById('range').onclick = function (e) {
+    var c = e.target.closest('.chip'); if (!c) return;
+    this.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); load(Number(c.dataset.days));
+  };
+  function load(days) {
+    var to = new Date(), from = new Date(to.getTime() - (days - 1) * 86400000), out = document.getElementById('out');
+    out.innerHTML = ''; queue = []; document.getElementById('sub').textContent = '読み込んでいます…';
+    fetch(API_URL + '?action=cleanBoard&from=' + ymd(from) + '&to=' + ymd(to)).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) throw new Error(j.error || '');
+      var b = j.board; document.getElementById('sub').textContent = md(b.from) + '〜' + md(b.to) + '　写真は押すと大きく表示します';
+      Object.keys(b.stores).forEach(function (s) {
+        var S = b.stores[s];
+        if (S.unresolved.length) {
+          var a = el('div', { class: 'card alert' }, [el('p', { class: 'q', text: s + '：理由がまだの未実施 ' + S.unresolved.length + '件' })]);
+          S.unresolved.forEach(function (u) { a.appendChild(el('p', { class: 'li', text: md(u.date) + '　' + u.item + '（' + u.area + '）' })); });
+          out.appendChild(a);
+        }
+        var p = el('div', { class: 'card' }, [el('p', { class: 'q', text: s + '：今日の予定の残り ' + S.todayPlan.length + '件' })]);
+        S.todayPlan.forEach(function (x) { p.appendChild(el('p', { class: 'li', text: '・' + x.item + '（' + x.area + '）' })); });
+        out.appendChild(p);
+        S.days.forEach(function (d) {
+          var c = el('div', { class: 'card day' }, [el('h2', { text: md(d.date) + '　' + s })]);
+          if (!d.records.length) c.appendChild(el('p', { class: 'empty', text: '記録なし' }));
+          ['厨房', 'ホール'].forEach(function (area) {
+            d.records.filter(function (r) { return r.area === area; }).forEach(function (r) {
+              var kind = r.result === '実施' ? ['', r.target !== d.date ? md(r.target) + 'の分' : '実施'] : r.result === '繰越' ? ['carry', md(r.target) + '→今日に回す'] : ['skip', 'できなかった'];
+              c.appendChild(el('div', { class: 'rec' }, [r.photo ? photo(r.photo) : el('div', { class: 'ph none', text: '写真なし' }),
+                el('div', {}, [el('div', { class: 'nm', text: r.item }), el('div', { class: 'meta' }, [el('span', { class: 'tag ' + kind[0], text: kind[1] }), area + '・' + (r.name || '—') + (r.at ? '・' + r.at : '')]),
+                  r.reason ? el('div', { class: 'meta', text: '理由：' + r.reason }) : null])]));
+            });
+          });
+          out.appendChild(c);
+        });
+      });
+    }).catch(function (e) { document.getElementById('sub').innerHTML = '<span class="err">読み込めませんでした。開き直してください。</span>'; });
+  }
+  load(7);
+</script>
+</body>
+</html>
