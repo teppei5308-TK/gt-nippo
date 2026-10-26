@@ -24,12 +24,15 @@
 // This public file contains no sales, reservation or customer data.
 const BOARD_READ_API='https://script.google.com/macros/s/AKfycbz8sujXVoNVzNroSuv_5d-K5j1rEWoGGvR-Luoe2B09jWoxxSjwiz2MVNn-n7TZ4i2pfA/exec';
 const message=document.getElementById('message'),frame=document.getElementById('board'),refresh=document.getElementById('refresh');
-let ready=true,busy=false,generation=0,timer=null;
-function clearBoard(text){generation++;frame.hidden=true;frame.removeAttribute('srcdoc');message.textContent=text;message.hidden=false;}
-function resetTimer(){clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden)loadBoard();},60000);}
+let ready=true,busy=false,generation=0,timer=null,shownHtml=null,keepScroll=null;
+function clearBoard(text){generation++;shownHtml=null;frame.hidden=true;frame.removeAttribute('srcdoc');message.textContent=text;message.hidden=false;}
+function resetTimer(){clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden)loadBoard();},300000);}
+// 表示中のボードは消さずに裏で取り直し、中身が変わったときだけ差し替える（スクロール位置は保つ）。
 async function loadBoard(){
  if(!ready||busy||document.hidden)return;
- busy=true;refresh.disabled=true;clearBoard('読み込んでいます。');
+ busy=true;refresh.disabled=true;refresh.textContent='確認中';
+ const showing=shownHtml!==null;
+ if(!showing)clearBoard('読み込んでいます。');
  const current=generation;
  try{
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
@@ -37,18 +40,20 @@ async function loadBoard(){
   try{response=await fetch(BOARD_READ_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'rakushoinBoard'}),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal});}
   finally{clearTimeout(timeout);}
   if(!response.ok)throw Error('network');
-  const data=await response.json();if(current!==generation||document.hidden)return;
-  if(!data.ok||typeof data.html!=='string'){clearBoard('読み込めませんでした。時間をおいて再度お試しください。');return;}
+  const data=await response.json();if(current!==generation)return;
+  if(!data.ok||typeof data.html!=='string'){if(!showing)clearBoard('読み込めませんでした。時間をおいて再度お試しください。');return;}
+  if(data.html===shownHtml)return;
   // The frame has an opaque origin and cannot access the parent page.
   const sizing='<script>new ResizeObserver(function(){parent.postMessage({kind:"rakushoin-board-height",height:document.documentElement.scrollHeight},"*");}).observe(document.documentElement);<\/script>';
   const publicHtml=data.html.replace('スタッフ限定 · スナップショット表示（自動同期は未実装）','スナップショット表示（自動同期は未実装）').replace('表示ごとに対象LINEグループへの所属を確認します。','LINEログインなしで閲覧できます。');
-  frame.srcdoc=publicHtml.replace('</body>',sizing+'</body>');frame.hidden=false;message.hidden=true;
- }catch(ignore){if(current===generation)clearBoard('確認できませんでした。通信状態を確認して、もう一度お試しください。');}
+  if(showing){keepScroll=window.scrollY;frame.style.height=frame.offsetHeight+'px';}
+  shownHtml=data.html;frame.srcdoc=publicHtml.replace('</body>',sizing+'</body>');frame.hidden=false;message.hidden=true;
+ }catch(ignore){if(current===generation&&!showing)clearBoard('確認できませんでした。通信状態を確認して、もう一度お試しください。');}
  finally{busy=false;refresh.disabled=false;refresh.textContent='最新の保存分を表示';resetTimer();}
 }
 refresh.addEventListener('click',loadBoard);
-window.addEventListener('message',event=>{if(event.source===frame.contentWindow&&event.data&&event.data.kind==='rakushoin-board-height'){const h=Number(event.data.height);if(Number.isFinite(h)&&h>0&&h<100000)frame.style.height=Math.ceil(h)+'px';}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearBoard('閲覧を再開するときに更新します。');clearTimeout(timer);}else loadBoard();});
+window.addEventListener('message',event=>{if(event.source===frame.contentWindow&&event.data&&event.data.kind==='rakushoin-board-height'){const h=Number(event.data.height);if(Number.isFinite(h)&&h>0&&h<100000){frame.style.height=Math.ceil(h)+'px';if(keepScroll!==null){window.scrollTo(0,keepScroll);keepScroll=null;}}}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(timer);else loadBoard();});
 window.addEventListener('pagehide',()=>{clearBoard('閲覧を終了しました。');clearTimeout(timer);});
 window.addEventListener('pageshow',()=>{if(ready&&!document.hidden)loadBoard();});
 refresh.disabled=false;loadBoard();
