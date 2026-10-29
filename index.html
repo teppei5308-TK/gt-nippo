@@ -738,22 +738,38 @@
     document.querySelectorAll('#form input, #form textarea, #form select, #form button').forEach(function (i) { if (i.id !== 'send') i.disabled = true; });
     submitClosing(payload);
   });
-  function submitClosing(payload) {
-    var err = document.getElementById('err');
-    var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = '送信中…（入力と写真を保存しています）';
+  // 写真の読み取りで保存に1分以上かかると、LINE内ブラウザが先に通信を打ち切る（サーバー側は保存を続ける）。
+  // そのときは同じ受付で自動的に確かめ直し、保存できていればこのページからトークへ流す。
+  var REPORT_POSTED = false, RECHECK_WAIT = 20000, RECHECK_MAX = 8;
+  function submitClosing(payload, tries) {
+    tries = tries || 0;
+    var err = document.getElementById('err'); err.textContent = '';
+    var btn = document.getElementById('send'); btn.disabled = true;
+    btn.textContent = tries ? '保存を確認しています…（' + tries + '回目・閉じずにお待ちください）' : '送信中…（入力と写真を保存しています）';
     var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
     fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'submit', token: token, payload: payload }) })
       .then(function (res) { return res.json(); })
       .then(function (r) {
-        if (!r || !r.ok) throw new Error((r && r.error) || '送信できませんでした');
+        if (!r || !r.ok) { var se = new Error((r && r.error) || '送信できませんでした'); se.server = true; throw se; }
         document.getElementById('form').classList.add('hide'); document.getElementById('bar').classList.add('hide');
         document.getElementById('result').classList.remove('hide');
         document.getElementById('preview').textContent = r.message;
         document.querySelector('#result h1').textContent = '保存しました（受付ID ' + r.id + '）';
-        if (!r.repeated) postToChat(payload.store, r.id, r.message);
+        // repeated＝前回の通信が途中で切れて、このページからはまだトークへ流していない
+        if (!REPORT_POSTED) { REPORT_POSTED = true; postToChat(payload.store, r.id, r.message); }
         else document.getElementById('doneNote').textContent = '同じ受付IDで保存済みです。日報の重複登録・トークへの再投稿はしていません。';
       })
-      .catch(function (e) { btn.disabled = false; btn.textContent = '同じ受付で再確認する'; err.textContent = '送信結果を確認できませんでした: ' + e.message + '。入力と写真は保持しています。再確認ボタンは同じ内容・受付情報を使います。'; });
+      .catch(function (e) {
+        // 通信切れ・サーバーがまだ保存中のときだけ自動で確かめ直す（入力の誤りなどは止める）
+        var retry = (!e.server || /保存状況を確認中/.test(e.message)) && tries < RECHECK_MAX;
+        if (retry) {
+          btn.textContent = '保存を確認しています…（閉じずにお待ちください）';
+          err.textContent = '写真の読み取りに時間がかかっています。保存できたら自動でグループに流します。';
+          setTimeout(function () { submitClosing(payload, tries + 1); }, RECHECK_WAIT);
+          return;
+        }
+        btn.disabled = false; btn.textContent = '同じ受付で再確認する'; err.textContent = '送信結果を確認できませんでした: ' + e.message + '。入力と写真は保持しています。再確認ボタンは同じ内容・受付情報を使います。';
+      });
   }
 </script>
 </body>
