@@ -37,9 +37,10 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>清掃ボード</h1>
+  <h1 id="ttl">清掃ボード</h1>
   <p class="sub" id="sub">読み込んでいます…</p>
   <div class="chips" id="range"><span class="chip on" data-days="7">7日間</span><span class="chip" data-days="14">14日間</span><span class="chip" data-days="31">31日間</span></div>
+  <div class="chips" id="stores"></div>
   <div id="out"></div>
 </div>
 <div id="big"><img alt=""></div>
@@ -63,6 +64,15 @@
     };
     return d;
   }
+  // 店舗：?store=楽書院（LINE から開くと ?liff.state=… の中に入って届くこともある）。無ければ全店
+  var STORE = (function () { var q = location.search + location.hash; for (var i = 0; i < 2; i++) { try { q = decodeURIComponent(q); } catch (e) {} } var m = q.match(/[?&#]store=([^&#]+)/); return m ? m[1].replace(/\+/g, ' ').trim() : ''; })();
+  var LAST = null;
+  function setStore(s) {
+    STORE = s;
+    try { history.replaceState(null, '', location.pathname + (s ? '?store=' + encodeURIComponent(s) : '')); } catch (e) {}
+    if (LAST) render(LAST);
+  }
+  document.getElementById('stores').onclick = function (e) { var c = e.target.closest('.chip'); if (c) setStore(c.dataset.store); };
   document.getElementById('big').onclick = function () { this.style.display = 'none'; };
   document.getElementById('range').onclick = function (e) {
     var c = e.target.closest('.chip'); if (!c) return;
@@ -73,8 +83,17 @@
     out.innerHTML = ''; queue = []; document.getElementById('sub').textContent = '読み込んでいます…';
     fetch(API_URL + '?action=cleanBoard&from=' + ymd(from) + '&to=' + ymd(to)).then(function (r) { return r.json(); }).then(function (j) {
       if (!j.ok) throw new Error(j.error || '');
-      var b = j.board; document.getElementById('sub').textContent = md(b.from) + '〜' + md(b.to) + '　写真は押すと大きく表示します';
-      Object.keys(b.stores).forEach(function (s) {
+      LAST = j.board; render(LAST);
+    }).catch(function (e) { document.getElementById('sub').innerHTML = '<span class="err">読み込めませんでした。開き直してください。</span>'; });
+  }
+  function render(b) {
+      var out = document.getElementById('out'); out.innerHTML = ''; queue = [];
+      document.getElementById('sub').textContent = md(b.from) + '〜' + md(b.to) + '　写真は押すと大きく表示します';
+      var names = Object.keys(b.stores); if (STORE && names.indexOf(STORE) < 0) STORE = '';
+      document.getElementById('ttl').textContent = '清掃ボード' + (STORE ? '　' + STORE : '');
+      var sc = document.getElementById('stores'); sc.innerHTML = '';
+      [''].concat(names).forEach(function (s) { var c = el('span', { class: 'chip' + (s === STORE ? ' on' : ''), text: s || '全店' }); c.dataset.store = s; sc.appendChild(c); });
+      names.filter(function (s) { return !STORE || s === STORE; }).forEach(function (s) {
         var S = b.stores[s];
         if (S.unresolved.length) {
           var a = el('div', { class: 'card alert' }, [el('p', { class: 'q', text: s + '：理由がまだの未実施 ' + S.unresolved.length + '件' })]);
@@ -98,8 +117,8 @@
           out.appendChild(c);
         });
       });
-    }).catch(function (e) { document.getElementById('sub').innerHTML = '<span class="err">読み込めませんでした。開き直してください。</span>'; });
   }
+  document.getElementById('ttl').textContent = '清掃ボード' + (STORE ? '　' + STORE : '');
   load(7);
 </script>
 </body>
