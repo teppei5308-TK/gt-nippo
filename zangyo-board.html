@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://script.google.com https://script.googleusercontent.com; img-src data:; base-uri 'none'; form-action 'none'">
+<title>GRACE TERRA｜勤怠・人件費 日報</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+  :root { --page: #F3F2EC; --pmuted: #737A73; --cds-dur-slow: .3s; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #151915; --pmuted: #949B93; color-scheme: dark; } }
+  :root[data-theme="dark"] { --page: #151915; --pmuted: #949B93; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { background: var(--page); margin: 0; padding-block: 10px 40px; -webkit-text-size-adjust: 100%;
+         padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+  #gt-status { max-width: 980px; margin: 24px auto; color: var(--pmuted); font: 14px/1.7 "Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif; text-align: center; }
+  [hidden] { display: none !important; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+'use strict';
+// この公開ファイルには勤怠・人件費のデータは入っていない。開いたときに鍵つきで取りに行く。
+const BOARD_API = 'https://script.google.com/macros/s/AKfycbycMWkwHsjwbov2kJ8vUF_C_2XinmY1hq_4iIlwO1COx0UHur5trsKKvVGZGuCgfSR7og/exec';
+(function () {
+  let RAW = null; const calcs = {}, draws = [], hooks = [], cache = {};
+  function data(id) {
+    if (!RAW) return { status: 'loading', data: [] };
+    if (id in RAW) return { status: 'ok', data: RAW[id], columns: [] };
+    if (calcs[id]) {
+      if (!(id in cache)) cache[id] = calcs[id].fn(...calcs[id].inputs.map((i) => data(i).data));
+      return { status: 'ok', data: cache[id], columns: [] };
+    }
+    return { status: 'missing', data: [] };
+  }
+  function runAll() {
+    for (const fn of hooks) { try { fn(); } catch (e) { console.error(e); } }
+    for (const [name, fn] of draws) for (const el of document.querySelectorAll('[data-draw="' + name + '"]')) {
+      if (el.closest('[hidden]')) continue;
+      try { fn(el); } catch (e) { console.error(name, e); }
+    }
+  }
+  window.dash = { data, colors: [], calc: (id, o) => { calcs[id] = o; }, draw: (n, f) => { draws.push([n, f]); }, onData: (f) => { hooks.push(f); },
+    params: () => ({}), setParams() {}, resetParams() {}, setLink() {}, refresh() {}, _run: runAll,
+    _set(d) {
+      const ym = d.ym, hm = (h) => { const m = Math.round(h * 60); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); };
+      const who = Object.fromEntries(d.staff_month.map((r) => [r.no, r]));
+      d.staff_day = d.staff_day.map(([dd, no, ot_h, cum_h]) => ({ day: ym + dd, no, name: (who[no] || {}).name || ('番号' + no), store: (who[no] || {}).store || '', kind: (who[no] || {}).kind || '', ot_h, ot: hm(ot_h), cum_h, cum: hm(cum_h), id: ym + dd + '-' + no }));
+      d.store_daily = d.store_daily.map(([dd, store, sales, labor, ratio, hours, people, unknown]) => ({ day: ym + dd, store, sales, labor, ratio, hours, people, unknown }));
+      d.missing = d.missing.map(([dd, no, store, what]) => ({ day: ym + dd, no, name: (who[no] || {}).name || ('番号' + no), store, what, id: ym + dd + '-' + no + '-' + what }));
+      RAW = d; for (const k in cache) delete cache[k]; runAll(); } };
+  // 正社員の累計（日ごと）は日別の残業から作る
+  dash.calc('staff_cum', { inputs: ['staff_month', 'staff_day', 'store_daily'], fn: (sm, sd, st) => {
+    const last = st.reduce((m, r) => (r.day > m ? r.day : m), ''); if (!last) return [];
+    const days = []; for (let d = new Date(last.slice(0, 8) + '01T00:00:00'); ; d.setDate(d.getDate() + 1)) {
+      const s = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); days.push(s); if (s >= last) break; }
+    const out = [];
+    for (const p of sm.filter((r) => r.kind === '正社員')) {
+      const mine = sd.filter((r) => r.no === p.no).sort((a, b) => (a.day < b.day ? -1 : 1)); let i = 0, c = 0;
+      for (const d of days) { while (i < mine.length && mine[i].day <= d) { c = mine[i].cum_h; i++; } out.push({ day: d, no: p.no, name: p.name, cum_h: d === last ? p.ot_h : c }); }
+    }
+    return out;
+  } });
+  let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(runAll, 150); });
+  async function load() {
+    const st = document.getElementById('gt-status');
+    const key = (location.hash.match(/k=([A-Za-z0-9_-]+)/) || [])[1] || '';
+    if (!key) { st.textContent = 'LINE で共有されたリンクから開いてください。'; return; }
+    try {
+      const res = await fetch(BOARD_API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ action: 'zangyoBoard', key }), credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' });
+      const j = await res.json();
+      if (!j.ok) { st.textContent = j.reason === 'key' ? 'このリンクでは見られません。新しいリンクを管理者に確認してください。' : '読み込めませんでした。時間をおいて開き直してください。'; return; }
+      st.hidden = true; document.querySelector('.gt').hidden = false; dash._set(j.data);
+    } catch (e) { st.textContent = '通信できませんでした。電波のよいところで開き直してください。'; }
+  }
+  addEventListener('DOMContentLoaded', load);
+})();
+</script>
+</head>
+<body>
+<p id="gt-status" role="status">読み込んでいます…</p>
+
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap");
+  /* TERRAS スタッフボードと同じ色・書体。生成りの地にカード、深緑のアクセント、金と煉瓦色で注意 */
+  .gt {
+    --g-ground: #F3F2EC; --g-panel: #FFFFFF; --g-ink: #1E231F; --g-ink2: #4B524C; --g-muted: #737A73; --g-line: #E1E1D8;
+    --g-accent: #3E5F3B; --g-accent-soft: #E4ECDF; --g-gold: #B7841A; --g-gold-soft: #F6ECD3; --g-warn: #9B5B12;
+    --g-clay: #B0573A; --g-clay-soft: #F5E3DC; --g-slate: #4D6B8C; --g-loss: #9EA39C; --g-loss-soft: #ECEDE8;
+    --g-font: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .gt {
+      --g-ground: #151915; --g-panel: #1E231F; --g-ink: #EEF0EA; --g-ink2: #C3C9C1; --g-muted: #949B93; --g-line: #323831;
+      --g-accent: #8DB886; --g-accent-soft: #25331F; --g-gold: #E2B550; --g-gold-soft: #3A3018; --g-warn: #E3A35A;
+      --g-clay: #E39578; --g-clay-soft: #3A251E; --g-slate: #8FB0D3; --g-loss: #6E746C; --g-loss-soft: #272B26;
+    }
+  }
+  :root[data-theme="dark"] .gt {
+    --g-ground: #151915; --g-panel: #1E231F; --g-ink: #EEF0EA; --g-ink2: #C3C9C1; --g-muted: #949B93; --g-line: #323831;
+    --g-accent: #8DB886; --g-accent-soft: #25331F; --g-gold: #E2B550; --g-gold-soft: #3A3018; --g-warn: #E3A35A;
+    --g-clay: #E39578; --g-clay-soft: #3A251E; --g-slate: #8FB0D3; --g-loss: #6E746C; --g-loss-soft: #272B26;
+  }
+
+  .gt { background: var(--g-ground); color: var(--g-ink); font-family: var(--g-font); font-size: 15px; line-height: 1.7;
+        border-radius: 18px; padding: 18px max(14px, 2vw) 32px; display: grid; gap: 14px; max-width: 980px; margin-inline: auto; }
+  .gt h1, .gt h2, .gt h3, .gt p, .gt ul, .gt ol { margin: 0; }
+  .gt b { font-weight: 900; }
+  .gt-head { display: grid; gap: 4px; }
+  .gt-brand { font-size: 12px; letter-spacing: .18em; color: var(--g-muted); font-weight: 700; }
+  .gt-title { font-size: 24px; font-weight: 900; line-height: 1.35; text-wrap: balance; }
+  .gt-sub { font-size: 13px; color: var(--g-ink2); }
+  .gt-take { font-size: 14px; color: var(--g-ink2); }
+  .gt-take b { color: var(--g-ink); font-variant-numeric: tabular-nums; }
+
+  .gt-section { display: grid; gap: 12px; }
+  .gt-h2 { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; padding-top: 6px; }
+  .gt-h2::before { content: ""; width: 4px; height: 1em; border-radius: 2px; background: var(--g-accent); align-self: center; }
+
+  .gt-card, .gt-report { background: var(--g-panel); border: 1px solid var(--g-line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .gt-card h3 { font-size: 15px; font-weight: 700; }
+  .gt-note { font-size: 12.5px; color: var(--g-muted); line-height: 1.55; }
+  .gt-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
+
+  /* 日報 */
+  .gt-report { border-width: 2px; border-color: var(--g-ink); gap: 14px; }
+  .gt-report-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--g-line); padding-bottom: 10px; }
+  .gt-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--g-muted); }
+  .gt-report-date { font-size: 22px; font-weight: 900; }
+  .gt-report-stores { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+  .gt-rstore { background: var(--g-ground); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+  .gt-rstore-name { font-size: 12.5px; font-weight: 700; color: var(--g-ink2); }
+  .gt-rstore-num { font-size: 36px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .gt-rstore-sub { font-size: 12px; color: var(--g-muted); font-variant-numeric: tabular-nums; line-height: 1.45; }
+  .gt-report-miss { display: grid; gap: 6px; }
+  .gt-report-miss h3 { font-size: 13px; font-weight: 700; color: var(--g-ink2); }
+  .gt-misslist { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .gt-misslist li { font-size: 13px; font-weight: 700; border-radius: 999px; padding: 4px 12px; background: var(--g-gold-soft); color: var(--g-warn); }
+
+  .gt-report-ot { display: grid; gap: 6px; }
+  .gt-report-ot h3 { font-size: 13px; font-weight: 700; color: var(--g-ink2); }
+  .gt-ottable td.cum-bad { color: var(--g-clay); font-weight: 900; }
+  .gt-ottable td.cum-warn { color: var(--g-warn); font-weight: 700; }
+  .gt-copyhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .gt-copy { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--g-panel); background: var(--g-accent); border: 0; border-radius: 999px; padding: 6px 16px; cursor: pointer; }
+  .gt-copy:focus-visible { outline: 2px solid var(--g-ink); outline-offset: 2px; }
+  .gt-reporttext { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--g-font); font-size: 14px; line-height: 1.75; background: var(--g-ground); border-radius: 12px; padding: 12px 14px; }
+  /* 数字のタイル */
+  .gt-tiles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+  .gt-tile { background: var(--g-panel); border: 1px solid var(--g-line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+  .gt-tile-label { font-size: 12.5px; font-weight: 700; color: var(--g-ink2); }
+  .gt-tile-num { font-size: 30px; font-weight: 900; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gt-tile-note { font-size: 11.5px; color: var(--g-muted); line-height: 1.4; }
+  .gt-tile.is-bad { background: var(--g-clay-soft); border-color: transparent; }
+  .gt-tile.is-bad .gt-tile-num { color: var(--g-clay); }
+  .gt-tile.is-warn { background: var(--g-gold-soft); border-color: transparent; }
+  .gt-tile.is-warn .gt-tile-num { color: var(--g-warn); }
+
+  /* グラフ */
+  .gt-chart { position: relative; min-height: 220px; }
+  .gt-chart svg { display: block; overflow: visible; }
+  .gt-chart text { font-family: var(--g-font); }
+  .gt-tip { position: absolute; pointer-events: none; background: var(--g-panel); border: 1px solid var(--g-line); border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 6px 10px; font-size: 12px; white-space: nowrap; z-index: 2; color: var(--g-ink); }
+  .gt-tip .t { color: var(--g-muted); font-weight: 700; }
+  .gt-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--g-ink2); }
+  .gt-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .gt-sw { width: 12px; height: 8px; border-radius: 3px; display: inline-block; }
+  .gt-sw.ok { background: var(--g-accent); }
+  .gt-sw.warn { background: var(--g-gold); }
+  .gt-sw.bad { background: var(--g-clay); }
+
+  /* 表 */
+  .gt-tablebox { max-height: 26rem; overflow: auto; border-radius: 10px; }
+  .gt-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .gt-table th { position: sticky; top: 0; background: var(--g-panel); text-align: left; font-weight: 700; font-size: 12px; color: var(--g-muted); padding: 6px 8px; border-bottom: 1px solid var(--g-line); white-space: nowrap; }
+  .gt-table td { padding: 6px 8px; border-bottom: 1px solid var(--g-line); }
+  .gt-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--g-ground) 55%, transparent); }
+  .gt-table td.num, .gt-table th.num { text-align: right; }
+  .gt-table td.bad { color: var(--g-clay); font-weight: 900; }
+  .gt-howto { padding-left: 1.3em; display: grid; gap: 4px; font-size: 12.5px; color: var(--g-ink2); max-width: 70ch; }
+
+  [data-dash-source-state=empty] { color: transparent; }
+  [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+</style>
+
+<div class="gt" hidden>
+  <header class="gt-head" id="top">
+    <span class="gt-brand">GRACE TERRA ・ TERRAS ／ 楽書院</span>
+    <h1 class="gt-title">GT 残業・人件費ボード</h1>
+    <p class="gt-sub"><span data-draw="through" data-source="ot_summary" data-field="through" data-row="0">—</span> までの打刻（ShiftMAX）で計算。毎朝更新します。</p>
+    <p class="gt-take">今月の残業が45時間を超えた人 <b data-draw="n45" data-source="ot_summary" data-field="n45" data-row="0">—</b> 人、固定残業の30時間を超えた人 <b data-draw="n30" data-source="ot_summary" data-field="n30" data-row="0">—</b> 人、打刻漏れ <b data-draw="nmiss" data-source="ot_summary" data-field="nmiss" data-row="0">—</b> 件。</p>
+  </header>
+
+  <section class="gt-section" id="daily">
+    <div class="gt-report">
+      <div class="gt-report-head">
+        <span class="gt-eyebrow">勤怠・人件費 日報</span>
+        <h2 class="gt-report-date" data-draw="rdate" data-source="ot_summary" data-field="through" data-row="0">—</h2>
+      </div>
+      <div class="gt-report-stores">
+        <div class="gt-rstore">
+          <span class="gt-rstore-name">TERRAS</span>
+          <span class="gt-rstore-num" data-draw="dratio" data-store="TERRAS" data-source="day_report" data-field="ratio" data-where="store=TERRAS">—</span>
+          <span class="gt-rstore-sub">売上 <span data-draw="dsales" data-store="TERRAS" data-source="day_report" data-field="sales" data-where="store=TERRAS">—</span>／人件費 <span data-draw="dlabor" data-store="TERRAS" data-source="day_report" data-field="labor" data-where="store=TERRAS">—</span></span>
+          <span class="gt-rstore-sub">今月 <span data-draw="mratio" data-store="TERRAS" data-source="store_month" data-field="ratio" data-where="store=TERRAS">—</span></span>
+        </div>
+        <div class="gt-rstore">
+          <span class="gt-rstore-name">楽書院</span>
+          <span class="gt-rstore-num" data-draw="dratio" data-store="楽書院" data-source="day_report" data-field="ratio" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span>
+          <span class="gt-rstore-sub">売上 <span data-draw="dsales" data-store="楽書院" data-source="day_report" data-field="sales" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span>／人件費 <span data-draw="dlabor" data-store="楽書院" data-source="day_report" data-field="labor" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span></span>
+          <span class="gt-rstore-sub">今月 <span data-draw="mratio" data-store="楽書院" data-source="store_month" data-field="ratio" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span></span>
+        </div>
+      </div>
+      <div class="gt-report-ot">
+        <h3>残業（前日・15分以上）</h3>
+        <table class="gt-table gt-ottable" data-source="ot_day" data-row-key="no">
+          <thead><tr><th data-field="name">氏名</th><th data-field="store">店舗</th><th class="num" data-field="ot">前日</th><th class="num" data-field="cum">今月の累計</th></tr></thead>
+          <tbody data-draw="otday"></tbody>
+        </table>
+        <p class="gt-note gt-otnone" hidden>前日に15分以上残業した人はいません。</p>
+      </div>
+      <div class="gt-report-miss">
+        <h3>打刻漏れ（前日）</h3>
+        <ul class="gt-misslist" data-draw="rmiss" data-source="miss_day"></ul>
+        <p class="gt-note">今月まだ直っていない打刻漏れは <b data-draw="nmiss" data-source="ot_summary" data-field="nmiss" data-row="0">—</b> 件（下の一覧）。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="gt-section" id="report-text">
+    <div class="gt-card">
+      <div class="gt-copyhead">
+        <h3>LINEに貼る日報</h3>
+        <button type="button" class="gt-copy" aria-label="日報の文章をコピー">コピー</button>
+      </div>
+      <p class="gt-note">毎朝、前日分に作り直します。下の文章をそのまま管理職のグループに貼ってください。</p>
+      <pre class="gt-reporttext" data-draw="reporttext" data-source="report" data-field="text" data-row="0">—</pre>
+      <p class="gt-note gt-copied" hidden>コピーしました。</p>
+    </div>
+  </section>
+
+  <section class="gt-section" id="overtime">
+    <h2 class="gt-h2">残業</h2>
+    <div class="gt-tiles">
+      <div class="gt-tile" data-flag="n45" data-level="is-bad">
+        <span class="gt-tile-label">45時間を超えた人</span>
+        <span class="gt-tile-num"><span data-draw="n45" data-source="ot_summary" data-field="n45" data-row="0">—</span> 人</span>
+        <span class="gt-tile-note">月45時間が残業の原則の上限</span>
+      </div>
+      <div class="gt-tile" data-flag="n30" data-level="is-warn">
+        <span class="gt-tile-label">固定残業30時間を超えた人</span>
+        <span class="gt-tile-num"><span data-draw="n30" data-source="ot_summary" data-field="n30" data-row="0">—</span> 人</span>
+        <span class="gt-tile-note">超えた分は別に残業代がかかる</span>
+      </div>
+      <div class="gt-tile" data-flag="nmiss" data-level="is-warn">
+        <span class="gt-tile-label">打刻漏れ（今月）</span>
+        <span class="gt-tile-num"><span data-draw="nmiss" data-source="ot_summary" data-field="nmiss" data-row="0">—</span> 件</span>
+        <span class="gt-tile-note">出勤か退勤のどちらかが押されていない</span>
+      </div>
+    </div>
+
+    <div class="gt-grid">
+      <div class="gt-card" id="ot-by-staff">
+        <h3>スタッフ別の残業（今月）</h3>
+        <p class="gt-note">残業がある人だけ。点線が固定残業の30時間と上限の45時間。</p>
+        <div class="gt-legend">
+          <span><i class="gt-sw ok"></i>30時間まで</span>
+          <span><i class="gt-sw warn"></i>30時間超</span>
+          <span><i class="gt-sw bad"></i>45時間超</span>
+        </div>
+        <div class="gt-chart" data-draw="otbars" data-source="staff_month"></div>
+      </div>
+
+      <div class="gt-card" id="ot-cumulative">
+        <h3>正社員の残業の積み上がり</h3>
+        <p class="gt-note">日ごとの累計。30時間を超えた人に色、ほかは灰色。点線が30時間と45時間。</p>
+        <div class="gt-chart" data-draw="cumchart" data-source="staff_cum"></div>
+      </div>
+    </div>
+
+    <div class="gt-card" id="missing">
+      <h3>打刻漏れ</h3>
+      <p class="gt-note">本人に確認して、ShiftMAX で直してください。夜勤（日をまたぐ勤務）は1回の勤務として数えています。</p>
+      <div class="gt-tablebox">
+        <table class="gt-table" data-source="missing" data-row-key="id">
+          <thead><tr><th data-field="day">日付</th><th data-field="name">氏名</th><th data-field="store">店舗</th><th data-field="what">内容</th></tr></thead>
+          <tbody data-draw="misstable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="gt-card" id="staff-table">
+      <h3>スタッフ別の一覧</h3>
+      <p class="gt-note">「目安」は予定シフトを使わずに計算した値。月末に ShiftMAX の確定値と照らし合わせます。</p>
+      <div class="gt-tablebox">
+        <table class="gt-table" data-source="staff_month" data-row-key="no">
+          <thead><tr><th data-field="no">番号</th><th data-field="name">氏名</th><th data-field="store">店舗</th><th data-field="kind">区分</th><th class="num" data-field="days">出勤日数</th><th class="num" data-field="ot">残業</th><th class="num" data-field="missing">打刻漏れ</th><th data-field="note">注意</th></tr></thead>
+          <tbody data-draw="stafftable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="gt-section" id="labor">
+    <h2 class="gt-h2">売上に対する人件費率</h2>
+    <div class="gt-tiles">
+      <div class="gt-tile">
+        <span class="gt-tile-label">TERRAS 人件費率（今月）</span>
+        <span class="gt-tile-num" data-draw="mratio" data-store="TERRAS" data-source="store_month" data-field="ratio" data-where="store=TERRAS">—</span>
+        <span class="gt-tile-note">売上 <span data-draw="msales" data-store="TERRAS" data-source="store_month" data-field="sales" data-where="store=TERRAS">—</span>／人件費 <span data-draw="mlabor" data-store="TERRAS" data-source="store_month" data-field="labor" data-where="store=TERRAS">—</span></span>
+      </div>
+      <div class="gt-tile">
+        <span class="gt-tile-label">楽書院 人件費率（今月）</span>
+        <span class="gt-tile-num" data-draw="mratio" data-store="楽書院" data-source="store_month" data-field="ratio" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span>
+        <span class="gt-tile-note">売上 <span data-draw="msales" data-store="楽書院" data-source="store_month" data-field="sales" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span>／人件費 <span data-draw="mlabor" data-store="楽書院" data-source="store_month" data-field="labor" data-where="store=%E6%A5%BD%E6%9B%B8%E9%99%A2">—</span></span>
+      </div>
+    </div>
+
+    <div class="gt-grid">
+      <div class="gt-card" id="ratio-terras">
+        <h3>TERRAS 日別の人件費率</h3>
+        <p class="gt-note">売上は本店・2ND・催事・Uber の合計（税込）。点線は今月の平均で、平均より高い日は金色。灰色の点は売上のない日（製造・仕込みのみ）。</p>
+        <div class="gt-chart" data-draw="ratiobars" data-store="TERRAS" data-source="store_daily store_month"></div>
+      </div>
+      <div class="gt-card" id="ratio-rakushoin">
+        <h3>楽書院 日別の人件費率</h3>
+        <p class="gt-note">売上は Airレジの税込。点線は今月の平均で、平均より高い日は金色。灰色の点は売上のない日。</p>
+        <div class="gt-chart" data-draw="ratiobars" data-store="楽書院" data-source="store_daily store_month"></div>
+      </div>
+    </div>
+
+    <div class="gt-card" id="daily-table">
+      <h3>日別の売上と人件費</h3>
+      <div class="gt-tablebox">
+        <table class="gt-table" data-source="store_daily" data-row-key="day,store">
+          <thead><tr><th data-field="day">日付</th><th data-field="store">店舗</th><th class="num" data-field="sales">売上</th><th class="num" data-field="labor">人件費</th><th class="num" data-field="ratio">人件費率</th><th class="num" data-field="hours">労働時間</th><th class="num" data-field="people">人数</th></tr></thead>
+          <tbody data-draw="dailytable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="gt-card" id="howto">
+      <h3>計算のきまり</h3>
+      <ol class="gt-howto">
+        <li>勤務は ShiftMAX の打刻から作ります（TERRAS＝勤務先80、楽書院＝勤務先82）。出勤のあと20時間以内の退勤を同じ勤務とみなします。</li>
+        <li>残業は「出勤時刻を切り上げた時刻から9時間（8時間＋休憩1時間）を過ぎた分」。TERRAS の正社員4名は正時に切り上げ、ほかの人は15分単位で切り上げた目安です。TERRAS 正社員は9月の確定値とほぼ一致しました。</li>
+        <li>人件費は給与表（2026年10月）から計算し、社会保険などの会社負担は入れていません。正社員は月額（固定残業30時間分を含む）を1日あたりに割り、30時間を超えた残業は1.25倍で加算。パートは時給×実働（休憩を引く）に、8時間超と深夜（22〜5時）の割増を加えます。</li>
+        <li>名簿にない番号（1001）は時給がわからないため、労働時間には入れて、人件費には入れていません。</li>
+        <li>売上は税込です。TERRAS は日報の売上（本店・2ND・催事・Uber）、楽書院は Airレジの日別売上です。</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<script>
+  // 固定の基準（本人と決めた値）
+  window.GT = { FIXED_OT_H: 30, LIMIT_H: 45 };
+
+  dash.calc('ot_summary', {
+    inputs: ['staff_month', 'missing', 'store_daily'],
+    title: '残業と打刻漏れのまとめ',
+    description: '45時間・30時間を超えた人数、打刻漏れの件数、集計の最終日',
+    fn: (staff_month, missing, store_daily) => [{
+      n45: staff_month.filter((r) => r.ot_h > 45).length,
+      n30: staff_month.filter((r) => r.ot_h > 30).length,
+      nmiss: missing.length,
+      through: store_daily.reduce((m, r) => (r.day > m ? r.day : m), ''),
+    }],
+  });
+
+  dash.calc('store_month', {
+    inputs: ['store_daily'],
+    title: '店舗別 今月の合計',
+    description: '日別の売上・人件費・労働時間を店舗ごとに足し、人件費率＝人件費÷売上',
+    fn: (store_daily) => ['TERRAS', '楽書院'].map((store) => {
+      const rs = store_daily.filter((r) => r.store === store);
+      const sales = d3.sum(rs, (r) => r.sales || 0);
+      const labor = d3.sum(rs, (r) => r.labor || 0);
+      return { store, sales, labor, ratio: sales ? labor / sales : null, hours: d3.sum(rs, (r) => r.hours || 0) };
+    }),
+  });
+
+  dash.calc('day_report', {
+    inputs: ['store_daily'],
+    title: '前日の店舗別 人件費率',
+    description: '集計の最終日（前日）の店舗ごとの売上・人件費・人件費率',
+    fn: (store_daily) => {
+      const last = store_daily.reduce((m, r) => (r.day > m ? r.day : m), '');
+      return ['TERRAS', '楽書院'].map((store) => {
+        const r = store_daily.find((x) => x.day === last && x.store === store) || {};
+        return { store, day: last, sales: r.sales ?? null, labor: r.labor ?? 0, ratio: r.ratio ?? null, hours: r.hours ?? 0, people: r.people ?? 0 };
+      });
+    },
+  });
+
+  dash.calc('miss_day', {
+    inputs: ['missing', 'store_daily'],
+    title: '前日の打刻漏れ',
+    description: '集計の最終日（前日）に出た打刻漏れ',
+    fn: (missing, store_daily) => {
+      const last = store_daily.reduce((m, r) => (r.day > m ? r.day : m), '');
+      return missing.filter((r) => r.day === last);
+    },
+  });
+
+  dash.calc('ot_day', {
+    inputs: ['staff_day', 'store_daily'],
+    title: '前日の残業',
+    description: '集計の最終日（前日）に15分以上残業した人と、その人の今月の累計',
+    fn: (staff_day, store_daily) => {
+      const last = store_daily.reduce((m, r) => (r.day > m ? r.day : m), '');
+      return staff_day.filter((r) => r.day === last).sort((a, b) => b.ot_h - a.ot_h);
+    },
+  });
+</script>
+
+<script>
+  const fmtYen = (v) => d3.format(',')(Math.round(v)) + '円';
+  const fmtPct = d3.format('.1%');
+  const fmtH = (h) => { const m = Math.round(h * 60); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); };
+  const fmtDay = (s) => { const d = new Date(s + 'T00:00:00'); return (d.getMonth() + 1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）'; };
+  window.GTF = { fmtYen, fmtPct, fmtH, fmtDay };
+
+  const one = (id, field) => { const g = dash.data(id); return g.status === 'ok' && g.data.length ? g.data[0][field] : null; };
+  const storeRow = (store) => { const g = dash.data('store_month'); return g.status === 'ok' ? g.data.find((r) => r.store === store) : null; };
+
+  const dayRow = (store) => { const g = dash.data('day_report'); return g.status === 'ok' ? g.data.find((r) => r.store === store) : null; };
+  dash.draw('rdate', (el) => { const v = one('ot_summary', 'through'); el.textContent = v ? fmtDay(v) : '—'; });
+  dash.draw('dratio', (el) => { const r = dayRow(el.dataset.store); el.textContent = r && r.ratio != null ? fmtPct(r.ratio) : (r ? '売上なし' : '—'); });
+  dash.draw('dsales', (el) => { const r = dayRow(el.dataset.store); el.textContent = r && r.sales != null ? fmtYen(r.sales) : '—'; });
+  dash.draw('dlabor', (el) => { const r = dayRow(el.dataset.store); el.textContent = r ? fmtYen(r.labor) : '—'; });
+  dash.draw('otday', (tb) => {
+    const g = dash.data('ot_day');
+    tb.replaceChildren();
+    if (g.status !== 'ok') return;
+    for (const r of g.data) {
+      const tr = document.createElement('tr');
+      tr.dataset.key = r.no;
+      const cumCls = 'num' + (r.cum_h > window.GT.LIMIT_H ? ' cum-bad' : r.cum_h > window.GT.FIXED_OT_H ? ' cum-warn' : '');
+      for (const [v, cls] of [[r.name], [r.store], [r.ot, 'num'], [r.cum, cumCls]]) { const td = document.createElement('td'); td.textContent = v; if (cls) td.className = cls; tr.append(td); }
+      tb.append(tr);
+    }
+  });
+
+  dash.draw('reporttext', (el) => {
+    const g = dash.data('report');
+    el.textContent = g.status === 'ok' && g.data.length ? g.data[0].text : '—';
+  });
+  for (const btn of document.querySelectorAll('.gt-copy')) {
+    btn.addEventListener('click', () => {
+      const g = dash.data('report');
+      if (g.status !== 'ok' || !g.data.length) return;
+      const text = g.data[0].text;
+      const done = () => { for (const n of document.querySelectorAll('.gt-copied')) { n.hidden = false; setTimeout(() => { n.hidden = true; }, 2000); } };
+      const fallback = () => {
+        const pre = document.querySelector('.gt-reporttext');
+        if (!pre) return;
+        const r = document.createRange(); r.selectNodeContents(pre);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+    });
+  }
+
+  dash.draw('rmiss', (ul) => {
+    const g = dash.data('miss_day');
+    ul.replaceChildren();
+    if (g.status !== 'ok') return;
+    if (!g.data.length) { const li = document.createElement('li'); li.textContent = 'なし'; ul.append(li); return; }
+    for (const r of g.data) { const li = document.createElement('li'); li.textContent = r.name + '（' + r.store + '）' + r.what; ul.append(li); }
+  });
+
+  dash.draw('through', (el) => { const v = one('ot_summary', 'through'); el.textContent = v ? fmtDay(v) : '—'; });
+  dash.draw('n45', (el) => { const v = one('ot_summary', 'n45'); el.textContent = v == null ? '—' : String(v); });
+  dash.draw('n30', (el) => { const v = one('ot_summary', 'n30'); el.textContent = v == null ? '—' : String(v); });
+  dash.draw('nmiss', (el) => { const v = one('ot_summary', 'nmiss'); el.textContent = v == null ? '—' : String(v); });
+  dash.onData(() => {
+    const od = dash.data('ot_day');
+    for (const el of document.querySelectorAll('.gt-otnone')) el.hidden = !(od.status === 'ok' && od.data.length === 0);
+    for (const el of document.querySelectorAll('.gt-ottable')) el.hidden = od.status === 'ok' && od.data.length === 0;
+    for (const el of document.querySelectorAll('.gt-tile[data-flag]')) {
+      el.classList.toggle(el.dataset.level, (one('ot_summary', el.dataset.flag) || 0) > 0);
+    }
+  });
+
+  dash.draw('mratio', (el) => { const r = storeRow(el.dataset.store); el.textContent = r && r.ratio != null ? fmtPct(r.ratio) : '—'; });
+  dash.draw('msales', (el) => { const r = storeRow(el.dataset.store); el.textContent = r ? fmtYen(r.sales) : '—'; });
+  dash.draw('mlabor', (el) => { const r = storeRow(el.dataset.store); el.textContent = r ? fmtYen(r.labor) : '—'; });
+
+  dash.draw('misstable', (tb) => {
+    const g = dash.data('missing');
+    tb.replaceChildren();
+    if (g.status !== 'ok') return;
+    for (const r of g.data.slice().sort((a, b) => (a.day < b.day ? 1 : -1))) {
+      const tr = document.createElement('tr');
+      tr.dataset.key = r.id;
+      for (const v of [fmtDay(r.day), r.name, r.store, r.what]) { const td = document.createElement('td'); td.textContent = v; tr.append(td); }
+      tb.append(tr);
+    }
+  });
+
+  dash.draw('stafftable', (tb) => {
+    const g = dash.data('staff_month');
+    tb.replaceChildren();
+    if (g.status !== 'ok') return;
+    for (const r of g.data) {
+      const tr = document.createElement('tr');
+      tr.dataset.key = r.no;
+      const cells = [[r.no], [r.name], [r.store], [r.kind], [String(r.days), 'num'], [r.ot, 'num' + (r.ot_h > window.GT.LIMIT_H ? ' bad' : '')], [String(r.missing), 'num'], [r.note]];
+      for (const [v, cls] of cells) { const td = document.createElement('td'); td.textContent = v; if (cls) td.className = cls; tr.append(td); }
+      tb.append(tr);
+    }
+  });
+
+  dash.draw('dailytable', (tb) => {
+    const g = dash.data('store_daily');
+    tb.replaceChildren();
+    if (g.status !== 'ok') return;
+    for (const r of g.data.slice().sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : a.store < b.store ? -1 : 1))) {
+      const tr = document.createElement('tr');
+      tr.dataset.key = encodeURIComponent(r.day) + ',' + encodeURIComponent(r.store);
+      const cells = [[fmtDay(r.day)], [r.store], [r.sales == null ? '' : fmtYen(r.sales), 'num'], [fmtYen(r.labor), 'num'], [r.ratio == null ? '' : fmtPct(r.ratio), 'num'], [fmtH(r.hours), 'num'], [String(r.people), 'num']];
+      for (const [v, cls] of cells) { const td = document.createElement('td'); td.textContent = v; if (cls) td.className = cls; tr.append(td); }
+      tb.append(tr);
+    }
+  });
+</script>
+
+<script>
+  const css = (name) => getComputedStyle(document.querySelector('.gt') || document.documentElement).getPropertyValue(name).trim();
+  const G = (n) => css('--g-' + n);
+
+  function tipIn(box) {
+    let tip = box.querySelector('.gt-tip');
+    if (!tip) { tip = document.createElement('div'); tip.className = 'gt-tip'; tip.hidden = true; box.append(tip); }
+    return tip;
+  }
+  function placeTip(box, tip, x, y) {
+    const bw = box.clientWidth, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(bw - tw, x + 12)) + 'px';
+    tip.style.top = Math.max(0, y - tip.offsetHeight - 8) + 'px';
+  }
+
+  // スタッフ別の残業（横棒）
+  dash.draw('otbars', (box) => {
+    box.replaceChildren();
+    const g = dash.data('staff_month');
+    if (g.status !== 'ok') return;
+    const { FIXED_OT_H, LIMIT_H } = window.GT;
+    const rows = g.data.filter((r) => r.ot_h > 0).sort((a, b) => b.ot_h - a.ot_h);
+    const W = box.clientWidth || 360, rowH = 24;
+    const svg = d3.select(box).append('svg').attr('width', '100%');
+    const probe = svg.append('text').attr('font-size', 12);
+    const labelW = d3.max(rows, (r) => { probe.text(r.name); return probe.node().getComputedTextLength(); }) || 60;
+    probe.text('00:00'); const valW = probe.node().getComputedTextLength() + 8;
+    probe.remove();
+    const m = { top: 18, right: valW + 4, bottom: 6, left: labelW + 10 };
+    const H = m.top + rows.length * rowH + m.bottom;
+    svg.attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const xMax = Math.max(LIMIT_H + 10, d3.max(rows, (r) => r.ot_h) || 0);
+    const x = d3.scaleLinear([0, xMax], [m.left, W - m.right]);
+    const y = d3.scaleBand(rows.map((r) => r.no), [m.top, H - m.bottom]).padding(0.28);
+    const color = (h) => (h > LIMIT_H ? G('clay') : h > FIXED_OT_H ? G('gold') : G('accent'));
+    svg.append('g').selectAll('rect').data(rows).join('rect')
+      .attr('x', x(0)).attr('y', (r) => y(r.no)).attr('height', y.bandwidth())
+      .attr('width', (r) => Math.max(1, x(r.ot_h) - x(0))).attr('rx', 3).attr('fill', (r) => color(r.ot_h));
+    svg.append('g').selectAll('text').data(rows).join('text')
+      .attr('x', m.left - 8).attr('y', (r) => y(r.no) + y.bandwidth() / 2).attr('dy', '0.35em')
+      .attr('text-anchor', 'end').attr('font-size', 12).attr('fill', G('ink')).text((r) => r.name);
+    svg.append('g').selectAll('text').data(rows).join('text')
+      .attr('x', (r) => x(r.ot_h) + 6).attr('y', (r) => y(r.no) + y.bandwidth() / 2).attr('dy', '0.35em')
+      .attr('font-size', 12).attr('fill', G('muted')).style('font-variant-numeric', 'tabular-nums').text((r) => r.ot);
+    for (const [h, label] of [[FIXED_OT_H, '30時間'], [LIMIT_H, '45時間']]) {
+      svg.append('line').attr('x1', x(h)).attr('x2', x(h)).attr('y1', m.top - 4).attr('y2', H - m.bottom)
+        .attr('stroke', G('ink2')).attr('stroke-dasharray', '3 3');
+      svg.append('text').attr('x', x(h)).attr('y', m.top - 7).attr('text-anchor', 'middle').attr('font-size', 11)
+        .attr('fill', G('muted')).text(label);
+    }
+    box.style.minHeight = H + 'px';
+  });
+
+  // 正社員の累計残業（線）
+  dash.draw('cumchart', (box) => {
+    box.replaceChildren();
+    const g = dash.data('staff_cum');
+    if (g.status !== 'ok') return;
+    const { FIXED_OT_H, LIMIT_H } = window.GT;
+    const parse = (s) => new Date(s + 'T00:00:00');
+    const series = d3.groups(g.data, (r) => r.no).map(([no, rs]) => ({ no, name: rs[0].name, pts: rs.map((r) => ({ d: parse(r.day), v: r.cum_h, day: r.day })) }));
+    const last = (s) => s.pts[s.pts.length - 1].v;
+    series.sort((a, b) => last(a) - last(b));
+    const hot = series.filter((s) => last(s) > FIXED_OT_H).sort((a, b) => last(b) - last(a));
+    const W = box.clientWidth || 360, H = 260;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const probe = svg.append('text').attr('font-size', 11);
+    const endW = d3.max(hot, (s) => { probe.text(s.name.split(' ')[0] + ' ' + Math.round(last(s)) + 'h'); return probe.node().getComputedTextLength(); }) || 0;
+    probe.text('60h'); const tickW = probe.node().getComputedTextLength();
+    probe.remove();
+    const m = { top: 12, right: endW + 10, bottom: 22, left: tickW + 10 };
+    const days = series[0] ? series[0].pts.map((p) => p.d) : [];
+    const x = d3.scaleUtc(d3.extent(days), [m.left, W - m.right]);
+    const yMax = Math.max(LIMIT_H + 5, d3.max(series, last) || 0);
+    const y = d3.scaleLinear([0, yMax], [H - m.bottom, m.top]).nice();
+    const yTicks = y.ticks(5);
+    svg.append('g').selectAll('line').data(yTicks).join('line').attr('x1', m.left).attr('x2', W - m.right)
+      .attr('y1', y).attr('y2', y).attr('stroke', G('line'));
+    svg.append('g').selectAll('text').data(yTicks).join('text').attr('x', m.left - 6).attr('y', y).attr('dy', '0.35em')
+      .attr('text-anchor', 'end').attr('font-size', 11).attr('fill', G('muted')).text((v) => v + 'h');
+    const xTicks = x.ticks(Math.max(2, Math.floor((W - m.left - m.right) / 70)));
+    svg.append('g').selectAll('text').data(xTicks).join('text').attr('x', x).attr('y', H - 6).attr('text-anchor', 'middle')
+      .attr('font-size', 11).attr('fill', G('muted')).text((d) => (d.getMonth() + 1) + '/' + d.getDate());
+    for (const [h, label] of [[FIXED_OT_H, '30h'], [LIMIT_H, '45h']]) {
+      svg.append('line').attr('x1', m.left).attr('x2', W - m.right).attr('y1', y(h)).attr('y2', y(h))
+        .attr('stroke', G('ink2')).attr('stroke-dasharray', '3 3');
+    }
+    const line = d3.line().x((p) => x(p.d)).y((p) => y(p.v));
+    const pal = [G('clay'), G('gold'), G('slate'), G('accent')];
+    const colorOf = new Map(hot.map((s, i) => [s.no, pal[i % pal.length]]));
+    svg.append('g').selectAll('path').data(series).join('path').attr('d', (s) => line(s.pts)).attr('fill', 'none')
+      .attr('stroke', (s) => colorOf.get(s.no) || G('loss')).attr('stroke-width', (s) => (colorOf.has(s.no) ? 2.5 : 1.5))
+      .attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+    // 線の端に名前（重ならないよう縦にずらす）
+    const labels = hot.map((s) => ({ s, y: y(last(s)) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 13) labels[i].y = labels[i - 1].y + 13;
+    svg.append('g').selectAll('text').data(labels).join('text').attr('x', W - m.right + 6).attr('y', (l) => l.y).attr('dy', '0.35em')
+      .attr('font-size', 11).attr('fill', G('ink')).text((l) => l.s.name.split(' ')[0] + ' ' + Math.round(last(l.s)) + 'h');
+    // ツールチップ
+    const tip = tipIn(box);
+    const rule = svg.append('line').attr('y1', m.top).attr('y2', H - m.bottom).attr('stroke', G('loss')).attr('opacity', 0);
+    svg.append('rect').attr('x', m.left).attr('y', m.top).attr('width', W - m.left - m.right).attr('height', H - m.top - m.bottom)
+      .attr('fill', 'transparent')
+      .on('pointermove', (ev) => {
+        const [px] = d3.pointer(ev);
+        const i = d3.bisectCenter(days.map(Number), +x.invert(px));
+        const d = days[i]; if (!d) return;
+        rule.attr('x1', x(d)).attr('x2', x(d)).attr('opacity', 1);
+        const list = (hot.length ? hot : series.slice(-3).reverse()).map((s) => ({ s, v: s.pts[i] ? s.pts[i].v : 0 }));
+        tip.replaceChildren();
+        const t = document.createElement('div'); t.className = 't'; t.textContent = (d.getMonth() + 1) + '/' + d.getDate(); tip.append(t);
+        for (const { s, v } of list) {
+          const row = document.createElement('div');
+          const sw = document.createElement('i'); sw.className = 'gt-sw'; sw.style.background = colorOf.get(s.no) || G('loss');
+          row.append(sw, document.createTextNode(' ' + s.name + ' ' + GTF.fmtH(v)));
+          tip.append(row);
+        }
+        tip.hidden = false; placeTip(box, tip, x(d) * box.clientWidth / W, m.top + 10);
+      })
+      .on('pointerleave', () => { tip.hidden = true; rule.attr('opacity', 0); });
+  });
+
+  // 日別の人件費率（縦棒）
+  dash.draw('ratiobars', (box) => {
+    box.replaceChildren();
+    const g = dash.data('store_daily');
+    if (g.status !== 'ok') return;
+    const store = box.dataset.store;
+    const sm = dash.data('store_month');
+    const avg = sm.status === 'ok' ? (sm.data.find((r) => r.store === store) || {}).ratio : null;
+    const rows = g.data.filter((r) => r.store === store).sort((a, b) => (a.day < b.day ? -1 : 1));
+    const W = box.clientWidth || 360, H = 220;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('height', H);
+    const probe = svg.append('text').attr('font-size', 11); probe.text('100%'); const tickW = probe.node().getComputedTextLength(); probe.remove();
+    const m = { top: 16, right: 8, bottom: 22, left: tickW + 10 };
+    const x = d3.scaleBand(rows.map((r) => r.day), [m.left, W - m.right]).padding(0.25);
+    const CAP = 1; // 100%を超える日は上を切って数字を添える
+    const yMax = Math.min(CAP, Math.max(0.6, d3.max(rows, (r) => r.ratio || 0) || 0));
+    const y = d3.scaleLinear([0, yMax], [H - m.bottom, m.top]).nice();
+    const top = y.domain()[1];
+    const yv = (v) => y(Math.min(v, top));
+    const yTicks = y.ticks(4);
+    svg.append('g').selectAll('line').data(yTicks).join('line').attr('x1', m.left).attr('x2', W - m.right).attr('y1', y).attr('y2', y).attr('stroke', G('line'));
+    svg.append('g').selectAll('text').data(yTicks).join('text').attr('x', m.left - 6).attr('y', y).attr('dy', '0.35em').attr('text-anchor', 'end')
+      .attr('font-size', 11).attr('fill', G('muted')).text(d3.format('.0%'));
+    const step = Math.max(1, Math.ceil(rows.length / Math.max(2, Math.floor((W - m.left - m.right) / 34))));
+    svg.append('g').selectAll('text').data(rows.filter((r, i) => i % step === 0)).join('text')
+      .attr('x', (r) => x(r.day) + x.bandwidth() / 2).attr('y', H - 6).attr('text-anchor', 'middle').attr('font-size', 11)
+      .attr('fill', G('muted')).text((r) => Number(r.day.slice(8)));
+    const withSales = rows.filter((r) => r.ratio != null);
+    svg.append('g').selectAll('rect').data(withSales).join('rect')
+      .attr('x', (r) => x(r.day)).attr('width', x.bandwidth()).attr('y', (r) => yv(r.ratio)).attr('height', (r) => y(0) - yv(r.ratio))
+      .attr('rx', Math.min(3, x.bandwidth() / 2)).attr('fill', (r) => (avg != null && r.ratio > avg ? G('gold') : G('accent')));
+    svg.append('g').selectAll('text').data(withSales.filter((r) => r.ratio > top)).join('text')
+      .attr('x', (r) => x(r.day) + x.bandwidth() / 2).attr('y', m.top - 2).attr('text-anchor', 'middle').attr('font-size', 10)
+      .attr('font-weight', 700).attr('fill', G('clay')).text((r) => d3.format('.0%')(r.ratio));
+    svg.append('g').selectAll('circle').data(rows.filter((r) => r.ratio == null)).join('circle')
+      .attr('cx', (r) => x(r.day) + x.bandwidth() / 2).attr('cy', y(0) - 4).attr('r', 3).attr('fill', G('loss'));
+    if (avg != null) {
+      svg.append('line').attr('x1', m.left).attr('x2', W - m.right).attr('y1', y(avg)).attr('y2', y(avg))
+        .attr('stroke', G('ink2')).attr('stroke-dasharray', '3 3');
+    }
+    const tip = tipIn(box);
+    svg.append('g').selectAll('rect').data(rows).join('rect')
+      .attr('x', (r) => x(r.day) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('y', m.top).attr('height', H - m.top - m.bottom)
+      .attr('fill', 'transparent')
+      .on('pointerenter', (ev, r) => {
+        tip.replaceChildren();
+        const t = document.createElement('div'); t.className = 't'; t.textContent = GTF.fmtDay(r.day); tip.append(t);
+        const lines = r.sales == null
+          ? ['売上なし', '人件費 ' + GTF.fmtYen(r.labor), '労働 ' + GTF.fmtH(r.hours) + '・' + r.people + '人']
+          : ['人件費率 ' + GTF.fmtPct(r.ratio), '売上 ' + GTF.fmtYen(r.sales), '人件費 ' + GTF.fmtYen(r.labor), '労働 ' + GTF.fmtH(r.hours) + '・' + r.people + '人'];
+        for (const s of lines) { const d = document.createElement('div'); d.textContent = s; tip.append(d); }
+        tip.hidden = false;
+        placeTip(box, tip, (x(r.day) + x.bandwidth() / 2) * box.clientWidth / W, (r.ratio != null ? yv(r.ratio) : y(0)) * box.clientHeight / H);
+      })
+      .on('pointerleave', () => { tip.hidden = true; });
+  });
+</script>
+
+</body>
+</html>
