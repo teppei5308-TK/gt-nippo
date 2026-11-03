@@ -103,6 +103,7 @@ h1{font-size:22px;font-weight:900;margin:0;line-height:1.35}
 (function () {
   var LIFF_ID = '2011853204-GVDc6N2x';
   var API_URL = 'https://script.google.com/macros/s/AKfycbwC9Mbomsh1GBr7nl32N74gAfX-CMfK9jTCNCcFzGJswnxZWW0WhpiLjrv3BHEYNH-u9w/exec';
+  var TERRAS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbzSNma1CRL_Y3vzOSbgOy0IfO7HQ5OFi5d7JROor5UAugMG6HHvsCKFpTxSHUj47akK/exec';
   var STORES = ['TERRAS 本店', '楽書院', 'TERRAS 2ND'];
   var CLEAN_NAME = { 'TERRAS 本店': 'TERRAS 本店', '楽書院': '楽書院' };
 
@@ -116,6 +117,7 @@ h1{font-size:22px;font-weight:900;margin:0;line-height:1.35}
     yen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 6 8 6-8M12 12v8M7 13h10M7 17h10"/></svg>',
     plate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>',
     help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/></svg>'
+    , check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 12 2.5 2.5L16 9"/></svg>'
     , bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg>'
   };
   var CHEV = '<span class="chev" aria-hidden="true">›</span>';
@@ -147,7 +149,7 @@ h1{font-size:22px;font-weight:900;margin:0;line-height:1.35}
       { cls: 'main', ic: 'pen', t: '日報を書く', s: '締め・製造・早番', go: 'index.html' },
       { ic: 'spark', t: '清掃チェック', s: cleanable ? '今日の場所と写真' : '2NDは対象外', go: cleanable ? 'clean.html' : '', off: !cleanable },
       { ic: 'chart', t: 'ボード', s: store === '楽書院' ? '楽書院の数字と予約' : '本店・2NDの数字', go: boardUrl },
-      { ic: 'clock', t: '残業の報告', s: '準備中', go: '', off: true }
+      store !== '楽書院' ? { ic: 'check', t: '開店・閉店', s: 'チェックリスト', go: TERRAS_CHECK_URL } : { ic: 'clock', t: '残業の報告', s: '準備中', go: '', off: true }
     ];
     var box = document.getElementById('mainTiles');
     box.innerHTML = '';
@@ -163,6 +165,7 @@ h1{font-size:22px;font-weight:900;margin:0;line-height:1.35}
       cleanable ? { ic: 'list', t: '清掃の記録', s: 'この1週間', go: 'cleanboard.html?store=' + encodeURIComponent(CLEAN_NAME[store]) } : null,
       { ic: 'cal', t: 'シフト', s: '自分とお店のメンバー', go: 'shift.html' },
       store !== '楽書院' ? { ic: 'bulb', t: '新商品の相談', s: '社長に確認', go: 'https://teppei5308-tk.github.io/terras-price-cards/#ideas' } : null,
+      store !== '楽書院' ? { ic: 'clock', t: '残業の報告', s: '', soon: true } : null,
       { ic: 'yen', t: '勤怠・人件費', s: '', soon: true },
       { ic: 'plate', t: '食器の破損', s: '', soon: true },
       { ic: 'help', t: '使い方', s: '', go: '#help' }
