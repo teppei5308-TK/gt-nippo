@@ -229,7 +229,7 @@
   // 清掃（HACCP）は別ページ（v56）。?mode=清掃 / ?mode=clean で開いたらすぐ移動する
   var CLEAN_Q = location.search + location.hash; for (var qi = 0; qi < 2; qi++) { try { CLEAN_Q = decodeURIComponent(CLEAN_Q); } catch (e) {} }
   if (!TO_BOARD && /mode=(clean|清掃)/i.test(CLEAN_Q)) location.replace('clean.html');
-  var API_URL = 'https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbwC9Mbomsh1GBr7nl32N74gAfX-CMfK9jTCNCcFzGJswnxZWW0WhpiLjrv3BHEYNH-u9w/exec';
   var CONFIG = {}, LAST_REVIEW = {}, DENGON = {}, PARTS = {}, CLEAN = {}, STORE = '', MODE = '', CL_AREA = '', CL_SEL = {};
   var profile = { userId: '', displayName: '' };
   var photoDaily = null, photoCat = null, photoItems = [], photoProd = [], photoUber = null;
