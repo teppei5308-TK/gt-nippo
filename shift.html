@@ -130,7 +130,7 @@ h1{font-size:20px;font-weight:900;margin:0;flex:1}
 
     <div class="foot">
       <div id="conf"></div>
-      <div><button type="button" id="rename">名前を変える</button>　<a id="mgr" href="#">シフトを組む画面（管理者）</a></div>
+      <div><button type="button" id="rename">名前を変える</button></div>
     </div>
   </div>
 </div>
@@ -140,7 +140,6 @@ h1{font-size:20px;font-weight:900;margin:0;flex:1}
 (function () {
   var LIFF_ID = '2011853204-GVDc6N2x';
   var API_URL = 'https://script.google.com/macros/s/AKfycbwC9Mbomsh1GBr7nl32N74gAfX-CMfK9jTCNCcFzGJswnxZWW0WhpiLjrv3BHEYNH-u9w/exec';
-  var MGR_URL = 'https://script.google.com/a/macros/e-akane.com/s/AKfycbwm6dU_e8KMAf18W4LT9z3XlMQMLvvD7H6iUuuLbgIus5Jtzi6Iz6j49p49Dc0e9i2v/exec';
   var WD = ['日', '月', '火', '水', '木', '金', '土'];
   var ROLE_VAR = { 'ホール': 'hall', '調理': 'cook', 'パティシエ': 'pati', 'デシャップ': 'desh', 'ドリンク': 'drink', '洗い場': 'wash', '製造': 'make', '2ND': '2nd', '催事': 'event' };
   var PLACES = ['楽書院', 'TERRAS 本店', 'TERRAS 2ND'];
@@ -189,11 +188,6 @@ h1{font-size:20px;font-weight:900;margin:0;flex:1}
     load({ op: 'setMe', name: v }).then(function () { $('pkBtn').disabled = false; $('pkBtn').textContent = 'この名前で見る'; });
   };
   $('rename').onclick = function () { load({ op: 'list' }).then(function () { showPicker(D.staff); }); };
-  $('mgr').onclick = function (e) {
-    e.preventDefault();
-    if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) liff.openWindow({ url: MGR_URL, external: true });
-    else window.open(MGR_URL, '_blank', 'noopener');
-  };
 
   function rolesHtml(roles) { return roles.map(function (r) { return '<span class="role" style="background:' + color(r.role) + '">' + esc(r.role) + (r.from ? ' ' + esc(r.from) + '–' + esc(r.to) : '') + '</span>'; }).join(''); }
   function dateBox(s) { var d = dt(s).getDay(); return '<div class="date' + (s === D.today ? ' today' : d === 6 ? ' sat' : d === 0 ? ' sun' : '') + '"><b class="num">' + md(s) + '</b><small>' + wd(s) + '</small></div>'; }
