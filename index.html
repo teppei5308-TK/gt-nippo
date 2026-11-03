@@ -333,9 +333,23 @@
     }
     if (mfgItems.length && !hasProd) {
       var c2 = el('div', { class: 'card' }, [el('p', { class: 'q', text: '製造数・用意数' }), el('p', { class: 'hint', text: '販売数は写真から読みます。ここには今日の製造数（用意した数）を入れてください。' })]);
+      // 今日すでに登録された数（朝の登録＋追加）。2回目からは「追加で作った数」を入れる
+      var reg = {};
+      (PARTS[STORE] || []).forEach(function (x) {
+        Object.keys(x.mfg || {}).forEach(function (k) { var r = reg[k] = reg[k] || { base: null, add: 0, by: [] }; if (r.base === null && typeof x.mfg[k] === 'number') { r.base = x.mfg[k]; r.by.push(x.time + ' ' + (x.name || '—') + ' ' + x.mfg[k]); } });
+        Object.keys(x.mfgAdd || {}).forEach(function (k) { var r = reg[k] = reg[k] || { base: null, add: 0, by: [] }; if (typeof x.mfgAdd[k] === 'number') { r.add += x.mfgAdd[k]; r.by.push(x.time + ' ' + (x.name || '—') + ' +' + x.mfgAdd[k]); } });
+      });
       mfgItems.forEach(function (c) {
-        var inp = el('input', { type: 'number', inputmode: 'numeric', 'data-mfg': c.name, min: '0' });
-        c2.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + (c.mfgLabel || '製造') + '数・' + c.unit + '）' }), inp]));
+        var r = reg[c.name], lab = c.mfgLabel || '製造', total = r ? (r.base || 0) + r.add : 0;
+        if (r && !CLOSE) {
+          var inpA = el('input', { type: 'number', inputmode: 'numeric', 'data-mfgadd': c.name, min: '1' });
+          c2.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（追加で' + (lab === '用意' ? '用意した' : '作った') + '数・' + c.unit + '）' }), inpA]));
+          c2.appendChild(el('p', { class: 'hint', text: '登録済み ' + total + c.unit + '（' + r.by.join('／') + '）。足りなくなって追加した分だけ入れてください。合計は自動で足します。' }));
+        } else {
+          var inp = el('input', { type: 'number', inputmode: 'numeric', 'data-mfg': c.name, min: '0' });
+          c2.appendChild(el('div', { class: 'row' }, [el('label', { text: c.name + '（' + lab + '数・' + c.unit + '）' }), inp]));
+          if (r) c2.appendChild(el('p', { class: 'hint', text: '登録済み ' + total + c.unit + '（' + r.by.join('／') + '）。空欄なら ' + total + c.unit + ' で日報に入ります。入れるとその数（1日の合計）に置き換わります。' }));
+        }
       });
       dyn.appendChild(c2);
     }
@@ -656,23 +670,24 @@
 
   // 製造・早番の途中登録
   function collect() {
-    var mfg = {}, nums = {}, texts = {}, arMap = {}, custom = {};
+    var mfg = {}, mfgAdd = {}, nums = {}, texts = {}, arMap = {}, custom = {};
     document.querySelectorAll('[data-mfg]').forEach(function (i) { if (i.value !== '') mfg[i.dataset.mfg] = Number(i.value); });
+    document.querySelectorAll('[data-mfgadd]').forEach(function (i) { if (i.value !== '' && Number(i.value) > 0) mfgAdd[i.dataset.mfgadd] = Number(i.value); });
     document.querySelectorAll('[data-num]').forEach(function (i) { if (i.value !== '') nums[i.dataset.num] = Number(i.value); });
     document.querySelectorAll('[data-text]').forEach(function (i) { if (i.value.trim()) texts[i.dataset.text] = i.value.trim(); });
     document.querySelectorAll('[data-ar]').forEach(function (i) { var a = arMap[i.dataset.ar] = arMap[i.dataset.ar] || { name: i.dataset.ar }; if (i.value !== '') a[i.dataset.f] = i.dataset.f === 'amount' ? Number(i.value) : i.value.trim(); });
     document.querySelectorAll('[data-cm]').forEach(function (i) { if (i.value.trim()) custom[i.dataset.cm] = i.value.trim(); });
-    return { mfg: mfg, nums: nums, texts: texts, ar: Object.keys(arMap).map(function (k) { return arMap[k]; }).filter(function (a) { return a.content || a.amount; }), custom: custom };
+    return { mfg: mfg, mfgAdd: mfgAdd, nums: nums, texts: texts, ar: Object.keys(arMap).map(function (k) { return arMap[k]; }).filter(function (a) { return a.content || a.amount; }), custom: custom };
   }
   function sendPart() {
     var err = document.getElementById('err'), c = collect();
     var rvA = document.getElementById('rvAsked');
     var photos = []; if (!document.getElementById('prodCard').classList.contains('hide')) photoProd.forEach(function (d, i) { photos.push({ name: '製造表' + (i + 1), dataUrl: d }); });
-    var payload = { store: STORE, kind: MODE, photos: photos, mfg: c.mfg, nums: c.nums, texts: c.texts, ar: c.ar,
+    var payload = { store: STORE, kind: MODE, photos: photos, mfg: c.mfg, mfgAdd: c.mfgAdd, nums: c.nums, texts: c.texts, ar: c.ar,
       review: { asked: rvA && rvA.value !== '' ? Number(rvA.value) : '' },
       comments: MODE === '製造' ? {} : { custom: c.custom, role: val('role'), pos: document.getElementById('cPos').value.trim(), neg: document.getElementById('cNeg').value.trim() },
       note: MODE === '製造' ? document.getElementById('pNote').value.trim() : '', name: document.getElementById('name').value };
-    var cm = payload.comments, empty = !photos.length && !Object.keys(c.mfg).length && !Object.keys(c.nums).length && !Object.keys(c.texts).length && !c.ar.length && payload.review.asked === '' && !payload.note && !(cm.pos || cm.neg || Object.keys(cm.custom || {}).length);
+    var cm = payload.comments, empty = !photos.length && !Object.keys(c.mfg).length && !Object.keys(c.mfgAdd).length && !Object.keys(c.nums).length && !Object.keys(c.texts).length && !c.ar.length && payload.review.asked === '' && !payload.note && !(cm.pos || cm.neg || Object.keys(cm.custom || {}).length);
     if (empty) { err.textContent = '登録する内容を1つ以上入れてください'; return; }
     var btn = document.getElementById('send'); btn.disabled = true; btn.textContent = photos.length ? '登録中…（製造表を読み取っています）' : '登録中…';
     var token = ''; try { token = (typeof liff !== 'undefined' && liff.getAccessToken) ? (liff.getAccessToken() || '') : ''; } catch (e) {}
