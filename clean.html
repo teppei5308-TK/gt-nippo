@@ -40,12 +40,13 @@
   .cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .cam input{position:absolute;inset:0;opacity:0}
   .cam.need{border:2px solid var(--bad)}
-  .camw{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
-  .alb{position:relative;width:52px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:11px;line-height:1;padding:5px 0;text-align:center;color:var(--muted);overflow:hidden}
+  .camw{display:flex;align-items:center;gap:6px;flex:none}
+  .alb{position:relative;width:46px;height:52px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:10px;line-height:1.2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);overflow:hidden}
+  .alb b{font-size:18px;font-weight:400}
   .alb input{position:absolute;inset:0;opacity:0}
   .must{display:inline-block;font-size:11px;color:#fff;background:var(--bad);border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
   .cl-h{font-size:13px;font-weight:700;color:var(--muted);margin:14px 2px 6px}
-  .cl{display:grid;grid-template-columns:40px 1fr 52px;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
+  .cl{display:grid;grid-template-columns:40px 1fr auto;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
   .cl.on{border-color:var(--acc);background:#f1f5ee}
   .cl .ck{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;cursor:pointer}
   .cl.on .ck{background:var(--acc);border-color:var(--acc)}
@@ -112,9 +113,9 @@
     img.src = url;
   }
   function cam(photo, need, onPhoto) {
-    // 📷＝押すと背面カメラが起動（11/5 現場の要望）、下の「アルバム」＝撮ってある写真から選ぶ
+    // 📷＝押すと背面カメラが起動（11/5 現場の要望）、右の「アルバム」＝撮ってある写真から選ぶ
     var c = el('label', { class: 'cam' + (need && !photo ? ' need' : '') }, ['📷']), inp = el('input', { type: 'file', accept: 'image/*', capture: 'environment' });
-    var a = el('label', { class: 'alb' }, ['アルバム']), ainp = el('input', { type: 'file', accept: 'image/*' });
+    var a = el('label', { class: 'alb' }, [el('b', { text: '🖼' }), 'アルバム']), ainp = el('input', { type: 'file', accept: 'image/*' });
     if (photo) c.appendChild(el('img', { src: photo, alt: '' }));
     c.appendChild(inp); a.appendChild(ainp);
     inp.onchange = ainp.onchange = function (e) { var f = e.target.files && e.target.files[0]; if (f) shrink(f, onPhoto); };
