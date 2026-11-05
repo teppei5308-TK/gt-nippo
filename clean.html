@@ -109,7 +109,7 @@
     img.src = url;
   }
   function cam(photo, need, onPhoto) {
-    var c = el('label', { class: 'cam' + (need && !photo ? ' need' : '') }, ['📷']), inp = el('input', { type: 'file', accept: 'image/*' });
+    var c = el('label', { class: 'cam' + (need && !photo ? ' need' : '') }, ['📷']), inp = el('input', { type: 'file', accept: 'image/*', capture: 'environment' });  // 押すと背面カメラが起動（11/5 現場の要望）
     if (photo) c.appendChild(el('img', { src: photo, alt: '' }));
     c.appendChild(inp);
     inp.onchange = function (e) { var f = e.target.files && e.target.files[0]; if (f) shrink(f, onPhoto); };
