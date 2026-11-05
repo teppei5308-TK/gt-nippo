@@ -40,6 +40,9 @@
   .cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .cam input{position:absolute;inset:0;opacity:0}
   .cam.need{border:2px solid var(--bad)}
+  .camw{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
+  .alb{position:relative;width:52px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:11px;line-height:1;padding:5px 0;text-align:center;color:var(--muted);overflow:hidden}
+  .alb input{position:absolute;inset:0;opacity:0}
   .must{display:inline-block;font-size:11px;color:#fff;background:var(--bad);border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
   .cl-h{font-size:13px;font-weight:700;color:var(--muted);margin:14px 2px 6px}
   .cl{display:grid;grid-template-columns:40px 1fr 52px;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
@@ -109,11 +112,13 @@
     img.src = url;
   }
   function cam(photo, need, onPhoto) {
-    var c = el('label', { class: 'cam' + (need && !photo ? ' need' : '') }, ['📷']), inp = el('input', { type: 'file', accept: 'image/*', capture: 'environment' });  // 押すと背面カメラが起動（11/5 現場の要望）
+    // 📷＝押すと背面カメラが起動（11/5 現場の要望）、下の「アルバム」＝撮ってある写真から選ぶ
+    var c = el('label', { class: 'cam' + (need && !photo ? ' need' : '') }, ['📷']), inp = el('input', { type: 'file', accept: 'image/*', capture: 'environment' });
+    var a = el('label', { class: 'alb' }, ['アルバム']), ainp = el('input', { type: 'file', accept: 'image/*' });
     if (photo) c.appendChild(el('img', { src: photo, alt: '' }));
-    c.appendChild(inp);
-    inp.onchange = function (e) { var f = e.target.files && e.target.files[0]; if (f) shrink(f, onPhoto); };
-    return c;
+    c.appendChild(inp); a.appendChild(ainp);
+    inp.onchange = ainp.onchange = function (e) { var f = e.target.files && e.target.files[0]; if (f) shrink(f, onPhoto); };
+    return el('div', { class: 'camw' }, [c, a]);
   }
   function st() { return DATA && DATA.stores[STORE]; }
   function ukey(u) { return u.date + '|' + u.area + '|' + u.item; }
