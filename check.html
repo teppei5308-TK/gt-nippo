@@ -320,17 +320,18 @@
     if (type === 'group' || type === 'room') {
       liff.sendMessages([{ type: 'text', text: 'TERRAS ' + label + 'を報告しました（#' + s.receipt + '）' }])
         .then(() => { sentNote[k] = '<div class="msg">報告しました。数秒でグループに流れます。</div>'; update(); })
-        .catch(e => { shareText[k] = s.message; sentNote[k] = shareHtml('トークへの投稿に失敗しました（' + esc(e.message) + '）。記録は保存されています。'); update(); });
+        .catch(e => { shareText[k] = s.message; sentNote[k] = shareHtml('トークへの投稿に失敗しました（' + esc(e.message) + '）。記録は保存されています。', s.receipt); update(); });
       return;
     }
     shareText[k] = s.message;
-    sentNote[k] = shareHtml('記録は保存されました。全体日報に流すときは、下のボタンで「グレーステラ全体日報」を選んでください。');
+    sentNote[k] = shareHtml('記録は保存されました。全体日報に流すときは、下のボタンで「グレーステラ全体日報」を選んでください。', s.receipt);
     update();
   }
-  function shareHtml(note) {
+  function shareHtml(note, receipt) {
     let can = false; try { can = liffOk && liff.isApiAvailable('shareTargetPicker'); } catch (e) {}
-    if (!can) return '<div class="sent">記録は保存されました。LINEに流すときは「グレーステラ全体日報」のトークからアプリを開いて報告してください。</div>';
-    return '<div class="sent">' + note + '</div><button class="share" id="share">LINEのグループに流す</button>';
+    const rescue = receipt ? '<div class="sent">流し忘れたときは、全体日報のトークで <b>#' + esc(receipt) + '</b> と送ると流れます。</div>' : '';
+    if (!can) return '<div class="sent">記録は保存されました。</div>' + rescue;
+    return '<div class="sent">' + note + '</div><button class="share" id="share">LINEのグループに流す</button>' + rescue;
   }
   function bindShare() {
     const b = $('share'); if (!b) return;
