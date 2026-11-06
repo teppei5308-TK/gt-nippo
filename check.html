@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>開店・閉店チェック｜GTスタッフ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --brown:#5C4033; --cream:#F7F1E8; --line:#E6DCCD; --red:#C0392B; --green:#2E7D4F; --grey:#8A8A8A; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:"BIZ UDPGothic","Hiragino Sans","Noto Sans JP",sans-serif; background:#FFFDF9; color:#222; }
+  header { background:var(--brown); color:#fff; padding:14px 16px 10px; position:sticky; top:0; z-index:5; }
+  .brand { font-size:20px; font-weight:bold; letter-spacing:1px; }
+  .sub { font-size:13px; opacity:.9; margin-top:2px; }
+  .tabs { display:flex; gap:8px; margin-top:10px; }
+  .tab { flex:1; padding:10px 0; border:0; border-radius:10px; font-size:16px; font-weight:bold; background:rgba(255,255,255,.15); color:#fff; font-family:inherit; }
+  .tab.on { background:#fff; color:var(--brown); }
+  .bar { height:8px; background:rgba(255,255,255,.25); border-radius:4px; margin-top:10px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:#F2C76E; width:0; transition:width .3s; }
+  .count { font-size:12px; text-align:right; margin-top:4px; }
+  .name { margin:12px 16px 0; display:flex; align-items:center; gap:8px; font-size:14px; }
+  .name input { flex:1; font-size:16px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-family:inherit; }
+  .slot { margin:18px 16px 6px; font-size:17px; font-weight:bold; color:var(--brown); border-bottom:2px solid var(--brown); padding-bottom:4px; }
+  .slot small { color:var(--red); font-size:13px; margin-left:6px; }
+  .item { display:flex; gap:12px; margin:0 16px; padding:12px 4px; border-bottom:1px solid var(--line); align-items:flex-start; }
+  .box { flex:0 0 34px; height:34px; border:2.5px solid var(--brown); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; margin-top:2px; }
+  .item.on .box { background:var(--green); border-color:var(--green); }
+  .item.on .ttl { color:var(--grey); text-decoration:line-through; }
+  .body { flex:1; min-width:0; }
+  .ttl { font-size:16px; font-weight:bold; line-height:1.4; }
+  .no { color:var(--brown); margin-right:4px; }
+  .tag { display:inline-block; font-size:12px; color:#fff; background:var(--red); border-radius:4px; padding:1px 6px; margin-left:4px; vertical-align:2px; }
+  .note { font-size:13px; color:#555; margin-top:3px; }
+  .who { font-size:12px; color:var(--green); margin-top:4px; font-weight:bold; }
+  .ph { width:100%; max-width:360px; border-radius:8px; margin-top:8px; display:block; }
+  .busy { opacity:.5; pointer-events:none; }
+  .done { margin:24px 16px 40px; }
+  .done button { width:100%; padding:16px; font-size:18px; font-weight:bold; border:0; border-radius:12px; background:var(--brown); color:#fff; font-family:inherit; }
+  .done button:disabled { background:#CFC6BA; }
+  .done .msg { text-align:center; color:var(--green); font-weight:bold; font-size:17px; padding:14px; background:#EAF5EE; border-radius:12px; }
+  .open { margin:18px 16px 0; text-align:center; padding:14px; background:var(--cream); border:1px solid var(--brown); border-radius:12px; color:var(--brown); font-weight:bold; }
+  .loading { text-align:center; color:var(--grey); padding:60px 0; }
+  .cam { display:inline-block; margin-top:8px; padding:8px 14px; font-size:14px; font-weight:bold; border:1.5px solid var(--brown); border-radius:8px; color:var(--brown); background:#fff; }
+  .admin { text-align:center; margin:0 16px 40px; font-size:13px; }
+  .admin a { color:var(--grey); }
+  .hbtn { float:right; font-size:13px; font-weight:bold; background:rgba(255,255,255,.18); border-radius:14px; padding:4px 10px; margin-top:2px; letter-spacing:0; cursor:pointer; }
+  .pinbox { display:none; margin:12px 16px 0; padding:14px; background:var(--cream); border:1.5px solid var(--brown); border-radius:12px; }
+  .pinbox .pt { font-weight:bold; color:var(--brown); margin-bottom:8px; }
+  .pinbox input { width:100%; font-size:22px; padding:10px; border:1px solid var(--line); border-radius:8px; letter-spacing:6px; text-align:center; }
+  .pbtns { display:flex; gap:8px; margin-top:10px; }
+  .pbtns button { flex:1; padding:12px; font-size:16px; font-weight:bold; border:0; border-radius:10px; background:var(--brown); color:#fff; font-family:inherit; }
+  .pbtns .sub2 { background:#CFC6BA; color:#333; }
+  #pinmsg { color:var(--red); font-size:14px; margin-top:8px; font-weight:bold; }
+  .toast { position:fixed; left:16px; right:16px; bottom:24px; background:#333; color:#fff; padding:14px; border-radius:10px; font-size:15px; text-align:center; display:none; z-index:20; }
+  .adminbar { background:#F2C76E; color:#3a2a1f; font-size:13px; font-weight:bold; text-align:center; padding:8px; }
+  .filter { display:flex; gap:8px; margin:12px 16px 0; }
+  .chip { padding:7px 14px; border-radius:18px; border:1.5px solid var(--brown); color:var(--brown); font-size:14px; font-weight:bold; background:#fff; }
+  .chip.on { background:var(--brown); color:#fff; }
+  .onlyrest .item.on { display:none; }
+  .item.pending .who { color:var(--grey); }
+  .allok { display:none; text-align:center; margin:30px 16px; color:var(--green); font-weight:bold; }
+  .notice { display:none; margin:12px 16px 0; padding:12px; background:#FFF4D6; border:1.5px solid #E0A800; border-radius:12px; font-size:14px; color:#3a2a1f; }
+  .notice .nrest { margin-top:6px; line-height:1.6; }
+  .notice .nlink { display:inline-block; margin-top:8px; font-weight:bold; color:var(--brown); text-decoration:underline; }
+  .done button.partial { background:#D98E04; }
+  .done .hint { font-size:12px; color:var(--grey); text-align:center; margin-top:8px; }
+  .homebtn { display:inline-block; font-size:13px; font-weight:bold; color:#fff; text-decoration:none; background:rgba(255,255,255,.18); border-radius:14px; padding:4px 10px; margin-bottom:6px; }
+  .share { width:100%; margin-top:10px; padding:14px; font-size:16px; font-weight:bold; border:0; border-radius:12px; background:#06C755; color:#fff; font-family:inherit; }
+  .sent { font-size:13px; color:#555; text-align:center; margin-top:8px; line-height:1.6; }
+  .err { margin:12px 16px; padding:10px; background:#FDECEA; color:var(--red); border-radius:8px; font-size:14px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <a class="homebtn" href="app.html">‹ ホーム</a>
+  <div class="brand">TERRAS チェックリスト</div>
+  <div class="sub" id="today">読み込み中…</div>
+  <div class="tabs">
+    <button class="tab on" data-k="開店">開店前準備</button>
+    <button class="tab" data-k="閉店">閉店作業</button>
+  </div>
+  <div class="bar"><i id="bar"></i></div>
+  <div class="count" id="count"></div>
+</header>
+
+<div class="name">担当 <input id="name" placeholder="名前を入力（最初の1回だけ）" autocomplete="off"></div>
+<div class="filter"><span class="chip on" data-f="all">すべて</span><span class="chip" data-f="rest">残りだけ（<span id="restcnt">0</span>）</span></div>
+<div class="notice" id="notice"></div>
+<div class="toast" id="toast"></div>
+<div class="err" id="err"></div>
+<div id="list"><div class="loading">読み込み中…</div></div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  const LIFF_ID = '2011853204-GVDc6N2x';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwC9Mbomsh1GBr7nl32N74gAfX-CMfK9jTCNCcFzGJswnxZWW0WhpiLjrv3BHEYNH-u9w/exec';
+  let token = '', liffOk = false;
+  let data = null;
+  let kubun = (new Date().getHours() >= 13) ? '閉店' : '開店';
+  let onlyRest = false;
+  const photoCache = {};
+  const pend = {};      // まだサーバーに保存できていない変更 key -> {on, by, no, title, kubun}
+  let sending = false, flushTimer = null, retryTimer = null;
+  const $ = id => document.getElementById(id);
+
+  // 名前は端末に記憶
+  try { $('name').value = localStorage.getItem('terras_name') || ''; } catch (e) {}
+  $('name').addEventListener('change', () => { try { localStorage.setItem('terras_name', $('name').value.trim()); } catch (e) {} });
+  const myName = () => $('name').value.trim();
+
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { kubun = b.dataset.k; build(); window.scrollTo(0, 0); });
+  document.querySelectorAll('.chip').forEach(b => b.onclick = () => { onlyRest = b.dataset.f === 'rest'; build(); });
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 3000); }
+  function netErr(on) { $('err').textContent = '電波が弱いため保存を待っています。自動でもう一度送ります。'; $('err').style.display = on ? 'block' : 'none'; }
+
+  function api(op, extra) {
+    const body = Object.assign({ action: 'check', token: token, op: op }, extra || {});
+    return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+      .then(r => r.json()).then(j => { if (!j.ok) throw new Error(j.error || '通信エラー'); return j; });
+  }
+
+  // ----- 読み込み -----
+  function load() {
+    if (!token) return;
+    api('data').then(d => { data = d; build(); }).catch(e => {
+      if (/LINE から/.test(e.message)) { $('list').innerHTML = '<div class="loading" style="padding:40px 20px;line-height:1.8">LINEからアプリを開いてください。</div>'; return; }
+      setTimeout(load, 3000);
+    });
+  }
+  function poll() {
+    if (!data || !token || sending || document.hidden) return;
+    api('state').then(applyState).catch(() => {});
+  }
+  function applyState(s) {
+    if (!data) return;
+    if (s.today !== data.today) { load(); return; } // 日付が変わったら読み直す
+    data.state = s.state; data.done = s.done; data.reports = s.reports;
+    update();
+  }
+
+  // 画面上の状態（未保存の変更を優先）
+  function eff(key) {
+    if (key in pend) return pend[key].on ? { time: '保存中…', by: pend[key].by, pending: true } : null;
+    return data.state[key] || null;
+  }
+  const curItems = () => data.items.filter(i => i.kubun === kubun);
+
+  // 開店前の時刻を今日のオープン時刻から計算
+  function slotTime(slot) {
+    const m = slot.match(/開店(\d+)分前/);
+    if (!m || !data) return '';
+    const [h, mi] = data.openTime.split(':').map(Number);
+    const t = h * 60 + mi - Number(m[1]);
+    return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + '〜';
+  }
+
+  // ----- 一覧を作る（タブ切替・写真変更のときだけ） -----
+  function build() {
+    if (!data) return;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.k === kubun));
+    document.querySelectorAll('.chip').forEach(b => b.classList.toggle('on', (b.dataset.f === 'rest') === onlyRest));
+    $('today').textContent = data.date + '　' + (data.holiday ? '土日祝' : '平日') + '　OPEN ' + data.openTime;
+
+    let html = '', last = '';
+    curItems().forEach(i => {
+      if (i.slot !== last) {
+        last = i.slot;
+        const t = slotTime(i.slot);
+        html += '<div class="slot" data-slot="' + esc(i.slot) + '">⏰ ' + esc(i.slot) + (t ? '<small>' + t + '</small>' : '') + '</div>';
+      }
+      html += '<div class="item" data-no="' + i.no + '" data-slot="' + esc(i.slot) + '">' +
+        '<div class="box"></div><div class="body">' +
+        '<div class="ttl"><span class="no">' + i.no + '.</span>' + esc(i.title) + (i.tag ? '<span class="tag">' + esc(i.tag) + '</span>' : '') + '</div>' +
+        i.notes.map(x => '<div class="note">→ ' + esc(x) + '</div>').join('') +
+        '<div class="who"></div>' +
+        (i.img ? '<img class="ph" loading="lazy" data-id="' + esc(i.imgId) + '" src="' + esc(photoCache[i.imgId] || i.img) + '">' : '') +
+        '</div></div>';
+    });
+    html += '<div class="allok" id="allok">残っている作業はありません 👍</div>';
+    if (kubun === '開店') html += '<div class="open">OPEN！ 笑顔とあいさつで、最高の一日をスタート！</div>';
+    html += '<div class="done" id="done"></div><div class="admin">アプリ版（ver.6 をもとに作成）<br>写真の登録は元のチェックリストの「📷 店長」から</div>';
+    $('list').innerHTML = html;
+    $('list').classList.toggle('onlyrest', onlyRest);
+
+    document.querySelectorAll('img.ph').forEach(img => img.onerror = () => {
+      const id = img.dataset.id;
+      if (!id || photoCache[id] || !token) return;
+      photoCache[id] = 'loading';
+      api('photo', { id: id }).then(j => { photoCache[id] = j.url; img.src = j.url; }).catch(() => { img.remove(); });
+    });
+    document.querySelectorAll('.item').forEach(el => el.onclick = () => tap(Number(el.dataset.no)));
+    update();
+  }
+
+  // ----- 表示の更新（チェックのたびに。一覧は作り直さない） -----
+  function update() {
+    if (!data) return;
+    const items = curItems();
+    let n = 0;
+    const rest = [];
+    items.forEach(i => {
+      const st = eff(kubun + '-' + i.no);
+      const el = document.querySelector('.item[data-no="' + i.no + '"]');
+      if (st) n++; else rest.push(i);
+      if (!el) return;
+      el.classList.toggle('on', !!st);
+      el.classList.toggle('pending', !!(st && st.pending));
+      el.querySelector('.box').textContent = st ? '✓' : '';
+      el.querySelector('.who').textContent = st ? '✓ ' + st.time + '　' + (st.by || '') : '';
+    });
+    // 「残りだけ」表示のとき、全部終わった時間帯の見出しを隠す
+    document.querySelectorAll('.slot').forEach(s => {
+      const any = rest.some(i => i.slot === s.dataset.slot);
+      s.style.display = (onlyRest && !any) ? 'none' : '';
+    });
+    const ok = $('allok'); if (ok) ok.style.display = (onlyRest && rest.length === 0) ? 'block' : 'none';
+
+    $('bar').style.width = (items.length ? n / items.length * 100 : 0) + '%';
+    $('count').textContent = n + ' / ' + items.length + ' 完了';
+    $('restcnt').textContent = rest.length;
+
+    // 途中報告のお知らせ（他のスタッフにも見える）
+    const r = data.reports[kubun], d = data.done[kubun];
+    const nb = $('notice');
+    if (r && !d) {
+      nb.style.display = 'block';
+      nb.innerHTML = '<b>' + esc(r.time) + '　' + esc(r.by || '') + ' さんが途中報告</b>' +
+        '<div class="nrest">' + (rest.length ? '現在の残り ' + rest.length + ' 項目：' + rest.slice(0, 5).map(i => 'No.' + i.no + ' ' + esc(i.title)).join('、') + (rest.length > 5 ? ' ほか' + (rest.length - 5) + '項目' : '') : '残りはすべて完了しました') + '</div>' +
+        (onlyRest ? '' : '<span class="nlink" id="showrest">残りだけ表示する ›</span>');
+      const sr = $('showrest'); if (sr) sr.onclick = () => { onlyRest = true; build(); window.scrollTo(0, 0); };
+    } else nb.style.display = 'none';
+
+    // 報告ボタン
+    const box = $('done');
+    if (!box) return;
+    if (sentNote[kubun]) { box.innerHTML = sentNote[kubun]; bindShare(); return; }
+    if (d && rest.length === 0) {
+      box.innerHTML = '<div class="msg">本日の' + kubun + '作業 完了しました<br><small>' + esc(d.time) + '　' + esc(d.by || '') + '</small></div>';
+      return;
+    }
+    const partial = rest.length > 0;
+    box.innerHTML = '<button id="rep" class="' + (partial ? 'partial' : '') + '">' +
+      (partial ? '途中報告する（残り ' + rest.length + ' 項目）' : '完了報告する') + '</button>' +
+      (partial ? '<div class="hint">終わっていない作業は、他のスタッフの画面にも表示されます</div>' : '');
+    $('rep').onclick = () => doReport(rest);
+  }
+
+  // ----- チェック：すぐ画面に反映 → まとめて保存 -----
+  function tap(no) {
+    if (!myName()) { toast('先に担当者の名前を入力してください'); $('name').focus(); return; }
+    const key = kubun + '-' + no;
+    const item = curItems().find(i => i.no === no);
+    const now = eff(key);
+    const serverOn = !!data.state[key];
+    const want = !now;
+    if (want === serverOn && !(key in pend && pend[key].sent)) delete pend[key]; // 元に戻しただけ
+    else pend[key] = { on: want, by: myName(), no: no, title: item.title, kubun: kubun };
+    update();
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 600);
+  }
+
+  function flush(after) {
+    if (!token) return;
+    if (sending) { if (after) flush.after = after; return; }
+    const keys = Object.keys(pend).filter(k => !pend[k].sent);
+    if (!keys.length) { if (after) after(); return; }
+    sending = true;
+    const groups = {};
+    keys.forEach(k => { const p = pend[k]; p.sent = true; (groups[p.kubun] = groups[p.kubun] || []).push({ no: p.no, title: p.title, on: p.on, key: k }); });
+    const kub = Object.keys(groups)[0];
+    const sentNow = groups[kub];
+    Object.keys(groups).slice(1).forEach(g => groups[g].forEach(c => pend[c.key].sent = false)); // 次の回に送る
+    api('set', { kubun: kub, changes: sentNow.map(c => ({ no: c.no, title: c.title, on: c.on })), name: myName() })
+      .then(s => {
+        sending = false; netErr(false);
+        sentNow.forEach(c => { if (pend[c.key] && pend[c.key].sent && pend[c.key].on === c.on) delete pend[c.key]; else if (pend[c.key]) pend[c.key].sent = false; });
+        applyState(s);
+        const a = after || flush.after; flush.after = null;
+        if (Object.keys(pend).some(k => !pend[k].sent)) flush(a); else if (a) a();
+      })
+      .catch(() => {
+        sending = false; netErr(true);
+        sentNow.forEach(c => { if (pend[c.key]) pend[c.key].sent = false; });
+        clearTimeout(retryTimer); retryTimer = setTimeout(() => flush(after), 4000);
+      });
+  }
+
+  // ----- 報告（途中でもOK） -----
+  function doReport(rest) {
+    if (!myName()) { toast('先に担当者の名前を入力してください'); $('name').focus(); return; }
+    const btn = $('rep');
+    if (rest.length && !btn.dataset.ok) { // 途中報告は2回タップで確定
+      btn.dataset.ok = '1';
+      btn.textContent = '残り ' + rest.length + ' 項目のまま報告します（もう一度タップ）';
+      setTimeout(() => { if (btn.isConnected) { delete btn.dataset.ok; update(); } }, 4000);
+      return;
+    }
+    btn.disabled = true; btn.textContent = '送信中…';
+    const k = kubun;
+    flush(() => {
+      const restNow = curItems().filter(i => !eff(k + '-' + i.no));
+      api('report', { kubun: k, name: myName() })
+        .then(s => { relay(k, s); applyState(s); toast(s.partial ? '途中報告しました' : '完了報告しました'); })
+        .catch(e => { toast('送信できませんでした。もう一度押してください'); update(); });
+    });
+  }
+
+
+  // ----- LINEに流す：全体日報のトークから開いていれば #R を投稿（GT-bot が返信で流す・通数ゼロ） -----
+  const sentNote = {};
+  let shareText = {};
+  function relay(k, s) {
+    const label = k === '開店' ? '開店前準備' : '閉店作業';
+    let type = '';
+    try { type = (liffOk && liff.getContext()) ? liff.getContext().type : ''; } catch (e) {}
+    if (type === 'group' || type === 'room') {
+      liff.sendMessages([{ type: 'text', text: 'TERRAS ' + label + 'を報告しました（#' + s.receipt + '）' }])
+        .then(() => { sentNote[k] = '<div class="msg">報告しました。数秒でグループに流れます。</div>'; update(); })
+        .catch(e => { shareText[k] = s.message; sentNote[k] = shareHtml('トークへの投稿に失敗しました（' + esc(e.message) + '）。記録は保存されています。'); update(); });
+      return;
+    }
+    shareText[k] = s.message;
+    sentNote[k] = shareHtml('記録は保存されました。全体日報に流すときは、下のボタンで「グレーステラ全体日報」を選んでください。');
+    update();
+  }
+  function shareHtml(note) {
+    let can = false; try { can = liffOk && liff.isApiAvailable('shareTargetPicker'); } catch (e) {}
+    if (!can) return '<div class="sent">記録は保存されました。LINEに流すときは「グレーステラ全体日報」のトークからアプリを開いて報告してください。</div>';
+    return '<div class="sent">' + note + '</div><button class="share" id="share">LINEのグループに流す</button>';
+  }
+  function bindShare() {
+    const b = $('share'); if (!b) return;
+    b.onclick = () => {
+      const t = shareText[kubun]; if (!t) return;
+      liff.shareTargetPicker([{ type: 'text', text: t }], { isMultiple: false }).then(r => {
+        if (r) { sentNote[kubun] = '<div class="msg">グループに流しました。</div>'; update(); }
+      }).catch(e => toast('流せませんでした：' + e.message));
+    };
+  }
+
+  function start() {
+    if (typeof liff === 'undefined') { $('list').innerHTML = '<div class="loading">LINEの部品を読み込めませんでした。開き直してください。</div>'; return; }
+    liff.init({ liffId: LIFF_ID }).then(() => {
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      liffOk = true;
+      token = liff.getAccessToken();
+      if (!myName()) liff.getProfile().then(p => { if (!myName() && p.displayName) { $('name').value = p.displayName; try { localStorage.setItem('terras_name', p.displayName); } catch (e) {} } }).catch(() => {});
+      load();
+    }).catch(e => { $('list').innerHTML = '<div class="loading">LINEで開いてください（' + esc(e.message) + '）</div>'; });
+  }
+  if (window.__CHECK_DEMO) { token = 'demo'; api = window.__CHECK_DEMO; load(); } else start();
+  setInterval(poll, 20000); // 他のスタッフのチェックを20秒ごとに反映
+</script>
+</body>
+</html>
