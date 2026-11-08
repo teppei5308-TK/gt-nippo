@@ -104,6 +104,11 @@ h2 small{font-size:12px;color:var(--muted);font-weight:400}
 .lines b{font-size:21px;font-weight:900}
 .lines .w b{color:var(--accent)}.lines .g b{color:var(--gold)}
 .hint{font-size:14px;color:var(--ink2);margin:10px 0 0}
+.ubg{margin:14px 0 0;padding:12px;border-radius:10px;background:var(--ground)}
+.ubg-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--ink2);margin-bottom:6px}
+.ubg-h span{font-weight:700;color:var(--ink)}
+.ubg-h b{font-size:20px;font-weight:900;color:var(--ink)}
+.ubg-s{font-size:13px;color:var(--ink2);margin-top:6px}
 .live{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
 .live .mrow span{font-weight:700}.live .mrow small{font-size:12px;color:var(--muted);font-weight:400;margin-left:6px}
 .live .mrow b{font-size:22px;font-weight:900}
@@ -362,11 +367,13 @@ function render() {
 
   // 最新の営業日（ページの一番上。本店のみ・2ND は出さない 2026/10/20）
   var maxV = Math.max(L[2] * 1.05, y[0]);
-  var dayHtml = '<section class="card"><h2>' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）の売上<small>本店（税込）</small></h2><div class="hero">' +
-    '<div class="big num">' + man(y[0]) + '<span>円</span></div><div class="badge ' + mk[2] + '">' + mk[0] + ' ' + mk[1] + '</div>' +
-    (ub ? '<div class="sub">Uber <b class="num">' + man(ub[0]) + '</b>（' + ub[1] + '件）　本店＋Uber <b class="num">' + man(y[0] + ub[0]) + '</b></div>' : '') +
-    '<div class="sub">' + (y[1] ? '客数 <b class="num">' + y[1] + '名</b>　客単価 <b class="num">' + yen(y[0] / y[1]) + '</b>' : '') +
-    (r === 'win' ? '　金星まで あと <b class="num">' + man(L[1] - y[0]) + '</b>' : r === 'loss' ? '　白星まで あと <b class="num">' + man(L[0] - y[0]) + '</b>' : '') + '</div>' +
+  // 上の大きい数字は本店＋Uber の合計、その下に本店と Uber（LINE のカードと同じ並び 2026/11/08）。星・客単価・「白星まで」は本店だけ
+  var dayHtml = '<section class="card"><h2>' + (m0 + 1) + '/' + ad.getDate() + '（' + WD[ad.getDay()] + '）の売上<small>' + (ub ? '本店＋Uber（税込）' : '本店（税込）') + '</small></h2><div class="hero">' +
+    '<div class="big num">' + man(y[0] + (ub ? ub[0] : 0)) + '<span>円</span></div><div class="badge ' + mk[2] + '">' + mk[0] + ' ' + mk[1] + '</div>' +
+    (ub ? '<div class="sub">本店 <b class="num">' + man(y[0]) + '</b>' + (y[1] ? '・' + y[1] + '名・客単価 <b class="num">' + yen(y[0] / y[1]) + '</b>' : '') + '<br>Uber <b class="num">' + man(ub[0]) + '</b>' + (ub[1] ? '・' + ub[1] + '件' : '') + '</div>' +
+      (r === 'win' ? '<div class="sub">本店の金星まで あと <b class="num">' + man(L[1] - y[0]) + '</b></div>' : r === 'loss' ? '<div class="sub">本店の白星まで あと <b class="num">' + man(L[0] - y[0]) + '</b></div>' : '')
+    : '<div class="sub">' + (y[1] ? '客数 <b class="num">' + y[1] + '名</b>　客単価 <b class="num">' + yen(y[0] / y[1]) + '</b>' : '') +
+      (r === 'win' ? '　金星まで あと <b class="num">' + man(L[1] - y[0]) + '</b>' : r === 'loss' ? '　白星まで あと <b class="num">' + man(L[0] - y[0]) + '</b>' : '') + '</div>') +
     '<div class="ladder"><div class="track"><div class="fill" style="width:' + (y[0] / maxV * 100) + '%"></div>' +
     L.map(function (v, k) { return '<div class="tick' + (k ? ' g' : '') + '" style="left:' + (v / maxV * 100) + '%"></div>'; }).join('') + '</div>' +
     '<div class="tags2">' + L.map(function (v, k) { return '<span><i class="k' + k + '"></i>' + ['白星', '金星', 'トロフィー'][k] + ' ' + manL(v) + '</span>'; }).join('') + '</div></div>' +
@@ -412,6 +419,10 @@ function render() {
       '<div class="k"><span>日割り比</span><b class="num">' + (ahead >= 0 ? '+' : '−') + man(Math.abs(ahead)) + '</b><small>' + (ahead >= 0 ? '先行' : '遅れ') + '</small></div>' +
       '<div class="k"><span>白星</span><b class="num">' + wins + '勝' + losses + '敗</b><small class="num">勝率 ' + Math.round(wins / Math.max(1, wins + losses) * 100) + '%</small></div>' +
     '</div>' +
+    (DATA.uberTarget ? (function () { var ut = DATA.uberTarget, up = ubTotal / ut * 100, un = Math.max(0, ut - ubTotal);   // Uber の月目標と進み具合（ボード設定「Uber目標」・本人 11/8）
+      return '<div class="ubg"><div class="ubg-h"><span>Uber ' + (m0 + 1) + '月</span><b class="num">' + man(ubTotal) + '</b><small class="num">目標 ' + manL(ut) + ' の ' + up.toFixed(1) + '%</small></div>' +
+        '<div class="bar"><i style="width:' + Math.min(100, up) + '%;background:var(--slate)"></i></div>' +
+        '<div class="ubg-s num">' + (un > 0 ? 'あと ' + man(un) + (rest.length ? '・1日 ' + man(un / rest.length) : '') : '目標達成！') + '</div></div>'; })() : '') +
     '<p class="hint" style="margin:10px 0 0">目標は本店＋催事＋Uber の合計（税込）' + (mix ? '。いまの ' + mn(total).replace(/<[^>]+>/g, '') + 'のうち ' + mix : '') + '。2ND は含みません。<br>見込み＝今月の平均（平日 ' + man(avgW) + '・土日祝 ' + man(avgH) + '）× 残りの営業日（平日 ' + restW + '日・土日祝 ' + restH + '日）' + (ubDay ? '＋Uber（1日 ' + man(ubDay) + '）' : '') + '。' +
     (plans.length ? '催事の予定（' + plans.map(function (p) { return p[2]; }).join('・') + '）は入れていないので、その分が上乗せになります。' : '') + '</p></section>';
 
