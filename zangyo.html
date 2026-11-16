@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>GT 残業報告</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="残業報告">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   /* レイアウト：スマホ1列。上にタブ（報告／分析）、報告は「時間→休憩→業務→割合」の順に上から押していくだけ */
   :root{--bg:#f6f4ef;--card:#fff;--ink:#23262b;--muted:#6f757d;--line:#dcd8cf;--soft:#efece4;--acc:#5E7A4A;--acc2:#2F4858;--onacc:#fff;--warn:#8F6A1C;--warnbg:#fbf3e2;--bad:#9E3F33;--badbg:#fbf0ee;--carry:#c9c7bf}
@@ -523,7 +526,7 @@
     var fail = function () { $('who').textContent = 'LINE の情報を取得できませんでした（名前を入力してください）'; $('nameBox').classList.remove('hide'); };
     s.onload = function () {
       liff.init({ liffId: LIFF_ID }).then(function () {
-        if (!liff.isLoggedIn()) { liff.login(); return; }
+        if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href.split('#')[0] }); return; }
         return liff.getProfile().then(function (p) { profile = { userId: p.userId, displayName: p.displayName }; $('who').textContent = '報告者：' + p.displayName; if (/[?&]tab=a/.test(location.search)) show('A'); });
       }).catch(fail);
     };
