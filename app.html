@@ -148,7 +148,7 @@ h1{font-size:22px;font-weight:900;margin:0;line-height:1.35}
       { cls: 'main', ic: 'pen', t: '日報を書く', s: '締め・製造・早番', go: 'index.html' },
       { ic: 'spark', t: '清掃チェック', s: cleanable ? '今日の場所と写真' : '2NDは対象外', go: cleanable ? 'clean.html' : '', off: !cleanable },
       { ic: 'chart', t: 'ボード', s: store === '楽書院' ? '楽書院の数字と予約' : '本店・2NDの数字', go: boardUrl },
-      store !== '楽書院' ? { ic: 'check', t: '開店・閉店', s: 'チェックリスト', go: 'check.html' } : { ic: 'clock', t: '残業の報告', s: '準備中', go: '', off: true }
+      store !== '楽書院' ? { ic: 'check', t: '開店・閉店', s: 'チェックリスト', go: 'check.html' } : { ic: 'clock', t: '残業の報告', s: '業務の割合も入力', go: 'zangyo.html' }
     ];
     var box = document.getElementById('mainTiles');
     box.innerHTML = '';
@@ -164,7 +164,7 @@ h1{font-size:22px;font-weight:900;margin:0;line-height:1.35}
       cleanable ? { ic: 'list', t: '清掃の記録', s: 'この1週間', go: 'cleanboard.html?store=' + encodeURIComponent(CLEAN_NAME[store]) } : null,
       { ic: 'cal', t: 'シフト', s: '自分とお店のメンバー', go: 'shift.html' },
       store !== '楽書院' ? { ic: 'bulb', t: '新商品の相談', s: '社長に確認', go: 'https://teppei5308-tk.github.io/terras-price-cards/#ideas' } : null,
-      store !== '楽書院' ? { ic: 'clock', t: '残業の報告', s: '', soon: true } : null,
+      store !== '楽書院' ? { ic: 'clock', t: '残業の報告', s: '社員の残務', go: 'zangyo.html' } : null,
       { ic: 'yen', t: '勤怠・人件費', s: '', soon: true },
       { ic: 'plate', t: '食器の破損', s: '', soon: true },
       { ic: 'help', t: '使い方', s: '', go: '#help' }
