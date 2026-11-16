@@ -193,7 +193,7 @@
 (function () {
   var LIFF_ID = '2011853204-GVDc6N2x';
   var API_URL = 'https://script.google.com/macros/s/AKfycbwC9Mbomsh1GBr7nl32N74gAfX-CMfK9jTCNCcFzGJswnxZWW0WhpiLjrv3BHEYNH-u9w/exec';
-  var DEMO = !/github\.io$/.test(location.hostname) || /[?&]demo/.test(location.search);
+  var DEMO = !/(^|\.)(github\.io|gt-staff\.netlify\.app)$/.test(location.hostname) || /[?&]demo/.test(location.search);
   var BREAK_STD = 60, CAP_DEFAULT = 30 * 60;
   var STORES = [{ v: 'TERRAS 本店', n: 'TERRAS 本店', c: '#5E7A4A' }, { v: 'TERRAS 2ND', n: 'TERRAS 2ND', c: '#B8862B' }, { v: '楽書院', n: '楽書院', c: '#4F6FA8' }];
   var STORE_C = { '': 'var(--carry)' }; STORES.forEach(function (x) { STORE_C[x.v] = x.c; });
